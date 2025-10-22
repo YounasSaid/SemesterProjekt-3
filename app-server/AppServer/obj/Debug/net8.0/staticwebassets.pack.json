@@ -1,0 +1,29 @@
+{
+  "Files": [
+    {
+      "Id": "C:\\Users\\musta\\RiderProjects\\SemesterProjekt-3\\app-server\\AppServer\\obj\\Debug\\net8.0\\scopedcss\\projectbundle\\AppServer.bundle.scp.css",
+      "PackagePath": "staticwebassets\\AppServer.bundle.scp.css"
+    },
+    {
+      "Id": "C:\\Users\\musta\\RiderProjects\\SemesterProjekt-3\\app-server\\AppServer\\wwwroot\\app.css",
+      "PackagePath": "staticwebassets\\app.css"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.AppServer.Microsoft.AspNetCore.StaticWebAssets.props",
+      "PackagePath": "build\\Microsoft.AspNetCore.StaticWebAssets.props"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.build.AppServer.props",
+      "PackagePath": "build\\AppServer.props"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.buildMultiTargeting.AppServer.props",
+      "PackagePath": "buildMultiTargeting\\AppServer.props"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.buildTransitive.AppServer.props",
+      "PackagePath": "buildTransitive\\AppServer.props"
+    }
+  ],
+  "ElementsToRemove": []
+}
