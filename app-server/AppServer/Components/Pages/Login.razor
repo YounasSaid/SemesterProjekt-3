@@ -1,0 +1,51 @@
+﻿@page "/login"
+@using AppServer.Models
+@inject AppServer.Services.AuthUiService Auth
+@inject NavigationManager Nav
+
+<h2>Log ind</h2>
+
+<EditForm Model="_m" OnValidSubmit="OnSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="mb-2">
+        <label>Skolemail</label><br />
+        <InputText class="form-control" @bind-Value="_m.SchoolEmail" />
+    </div>
+
+    <div class="mb-2">
+        <label>Password</label><br />
+        <InputText class="form-control" type="password" @bind-Value="_m.Password" />
+    </div>
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <p class="text-danger">@_error</p>
+    }
+
+    <button type="submit" class="btn btn-primary">Log ind</button>
+    <button type="button" class="btn btn-link" @onclick="GoRegister">Opret bruger</button>
+</EditForm>
+
+@code {
+    private readonly LoginRequest _m = new();
+    private string? _error;
+
+    private async Task OnSubmit()
+    {
+        var (ok, code) = await Auth.LoginAsync(_m);
+        if (ok)
+        {
+            Nav.NavigateTo("/");
+        }
+        else
+        {
+            _error = code is "INVALID_CREDENTIALS"
+                ? "Forkert email eller adgangskode."
+                : "Noget gik galt.";
+        }
+    }
+
+    private void GoRegister() => Nav.NavigateTo("/register");
+}

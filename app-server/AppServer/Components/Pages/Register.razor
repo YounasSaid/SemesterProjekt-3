@@ -1,0 +1,61 @@
+﻿@page "/register"
+@using AppServer.Models
+@inject AppServer.Services.AuthUiService Auth
+@inject NavigationManager Nav
+
+<h2>Opret bruger</h2>
+
+<EditForm Model="_m" OnValidSubmit="OnSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="mb-2"><label>Fornavn</label><br /><InputText class="form-control" @bind-Value="_m.FirstName" /></div>
+    <div class="mb-2"><label>Efternavn</label><br /><InputText class="form-control" @bind-Value="_m.LastName" /></div>
+    <div class="mb-2"><label>Skolemail</label><br /><InputText class="form-control" @bind-Value="_m.SchoolEmail" /></div>
+    <div class="mb-2"><label>Password</label><br /><InputText class="form-control" type="password" @bind-Value="_m.Password" />
+    </div>
+
+    <div class="mb-2">
+        <label>Semester</label><br />
+        <InputSelect class="form-select" @bind-Value="_m.Semester">
+            @for (int i = 1; i <= 7; i++)
+            {
+                <option value="@i" disabled="@(i != 3)">@i</option>
+            }
+        </InputSelect>
+        <small>(Kun 3 er tilladt i POC)</small>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_msg)) { <p class="text-success">@_msg</p> }
+    @if (!string.IsNullOrEmpty(_error)) { <p class="text-danger">@_error</p> }
+
+    <button class="btn btn-primary" type="submit">Opret</button>
+    <button class="btn btn-link" type="button" @onclick="GoLogin">Til login</button>
+</EditForm>
+
+@code {
+    private readonly RegisterRequest _m = new() { Semester = 3 };
+    private string? _msg, _error;
+
+    private async Task OnSubmit()
+    {
+        var (ok, code) = await Auth.RegisterAsync(_m);
+        if (ok)
+        {
+            _msg = "Bruger oprettet – log ind";
+            await Task.Delay(800);
+            Nav.NavigateTo("/login");
+        }
+        else
+        {
+            _error = code switch
+            {
+                "INVALID_Semester" => "Kun semester 3 er tilladt i denne POC.",
+                "EMAIL_TAKEN"      => "Mailen er allerede brugt.",
+                _                  => "Noget gik galt."
+            };
+        }
+    }
+
+    private void GoLogin() => Nav.NavigateTo("/login");
+}

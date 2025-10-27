@@ -1,0 +1,77 @@
+{
+  "Version": 1,
+  "Hash": "YDk0ESlAbXxY6/eSV4X1uoAmXHDNmNLkQN9s4bn9naY=",
+  "Source": "AppServer",
+  "BasePath": "_content/AppServer",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [
+    {
+      "Name": "AppServer\\wwwroot",
+      "Source": "AppServer",
+      "ContentRoot": "C:\\Users\\musta\\RiderProjects\\SemesterProjekt-3\\app-server\\AppServer\\wwwroot\\",
+      "BasePath": "_content/AppServer",
+      "Pattern": "**"
+    }
+  ],
+  "Assets": [
+    {
+      "Identity": "C:\\Users\\musta\\RiderProjects\\SemesterProjekt-3\\app-server\\AppServer\\obj\\Debug\\net8.0\\scopedcss\\bundle\\AppServer.styles.css",
+      "SourceId": "AppServer",
+      "SourceType": "Computed",
+      "ContentRoot": "C:\\Users\\musta\\RiderProjects\\SemesterProjekt-3\\app-server\\AppServer\\obj\\Debug\\net8.0\\scopedcss\\bundle\\",
+      "BasePath": "_content/AppServer",
+      "RelativePath": "AppServer.styles.css",
+      "AssetKind": "All",
+      "AssetMode": "CurrentProject",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "ScopedCss",
+      "AssetTraitValue": "ApplicationBundle",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "C:\\Users\\musta\\RiderProjects\\SemesterProjekt-3\\app-server\\AppServer\\obj\\Debug\\net8.0\\scopedcss\\bundle\\AppServer.styles.css"
+    },
+    {
+      "Identity": "C:\\Users\\musta\\RiderProjects\\SemesterProjekt-3\\app-server\\AppServer\\obj\\Debug\\net8.0\\scopedcss\\projectbundle\\AppServer.bundle.scp.css",
+      "SourceId": "AppServer",
+      "SourceType": "Computed",
+      "ContentRoot": "C:\\Users\\musta\\RiderProjects\\SemesterProjekt-3\\app-server\\AppServer\\obj\\Debug\\net8.0\\scopedcss\\projectbundle\\",
+      "BasePath": "_content/AppServer",
+      "RelativePath": "AppServer.bundle.scp.css",
+      "AssetKind": "All",
+      "AssetMode": "Reference",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "ScopedCss",
+      "AssetTraitValue": "ProjectBundle",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "C:\\Users\\musta\\RiderProjects\\SemesterProjekt-3\\app-server\\AppServer\\obj\\Debug\\net8.0\\scopedcss\\projectbundle\\AppServer.bundle.scp.css"
+    },
+    {
+      "Identity": "C:\\Users\\musta\\RiderProjects\\SemesterProjekt-3\\app-server\\AppServer\\wwwroot\\app.css",
+      "SourceId": "AppServer",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\Users\\musta\\RiderProjects\\SemesterProjekt-3\\app-server\\AppServer\\wwwroot\\",
+      "BasePath": "_content/AppServer",
+      "RelativePath": "app.css",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "PreferTarget",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\app.css"
+    }
+  ]
+}
