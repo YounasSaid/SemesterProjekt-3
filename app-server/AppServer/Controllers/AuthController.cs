@@ -1,8 +1,7 @@
-﻿using System.Collections.Concurrent;
-using AppServer.Models;           // <-- vigtigt for RegisterRequest/LoginRequest
+﻿using AppServer.Models;
 using AppServer.Utils;
+using AppServer.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Http;
 
 namespace AppServer.Controllers;
 
@@ -11,16 +10,16 @@ namespace AppServer.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IPasswordHasher _hasher;
+    private readonly UserGrpcClient _grpcClient;
 
-    private static readonly ConcurrentDictionary<string, UserRow> Users = new();
-
-    public AuthController(IPasswordHasher hasher)
+    public AuthController(IPasswordHasher hasher, UserGrpcClient grpcClient)
     {
         _hasher = hasher;
+        _grpcClient = grpcClient;
     }
 
     [HttpPost("register")]
-    public IActionResult Register([FromBody] RegisterRequest req)
+    public async Task<IActionResult> Register([FromBody] RegisterRequest req)
     {
         if (!ModelState.IsValid)
             return ValidationProblem(ModelState);
@@ -30,52 +29,50 @@ public class AuthController : ControllerBase
             return BadRequest(new { code = "INVALID_SEMESTER" });
 
         var email = req.SchoolEmail.Trim().ToLowerInvariant();
+        var passwordHash = _hasher.Hash(req.Password);
 
-        if (Users.ContainsKey(email))
-            return Conflict(new { code = "EMAIL_TAKEN" });
+        // Kald Data Server via gRPC
+        var (success, userId, errorCode) = await _grpcClient.CreateUserAsync(
+            email, 
+            req.FirstName, 
+            req.LastName, 
+            passwordHash, 
+            req.Semester
+        );
 
-        var user = new UserRow
+        if (!success)
         {
-            UserId = Guid.NewGuid(),
-            FirstName = req.FirstName,
-            LastName = req.LastName,
-            Email = email,
-            PasswordHash = _hasher.Hash(req.Password),
-            Semester = req.Semester
-        };
+            if (errorCode == "EMAIL_TAKEN")
+                return Conflict(new { code = "EMAIL_TAKEN" });
+            
+            return StatusCode(500, new { code = "INTERNAL_ERROR" });
+        }
 
-        Users[email] = user;
-
-        return StatusCode(201, new RegisterResponse { UserId = user.UserId });
+        return StatusCode(201, new RegisterResponse { UserId = Guid.Parse(userId!) });
     }
 
     [HttpPost("login")]
-    public IActionResult Login([FromBody] LoginRequest req)
+    public async Task<IActionResult> Login([FromBody] LoginRequest req)
     {
         if (!ModelState.IsValid)
             return ValidationProblem(ModelState);
 
         var email = req.SchoolEmail.Trim().ToLowerInvariant();
 
-        if (!Users.TryGetValue(email, out var user))
+        // Hent bruger fra Data Server via gRPC
+        var (found, userId, userEmail, passwordHash, semester) = 
+            await _grpcClient.GetUserByEmailAsync(email);
+
+        if (!found)
             return Unauthorized(new { code = "INVALID_CREDENTIALS" });
 
-        if (!_hasher.Verify(req.Password, user.PasswordHash))
+        // Verificer password
+        if (!_hasher.Verify(req.Password, passwordHash!))
             return Unauthorized(new { code = "INVALID_CREDENTIALS" });
 
         // Gem bruger-id i session
-        HttpContext.Session.SetString(SessionKeys.UserId, user.UserId.ToString());
+        HttpContext.Session.SetString(SessionKeys.UserId, userId!);
 
-        return Ok(new LoginResponse { UserId = user.UserId });
-    }
-
-    private class UserRow
-    {
-        public Guid UserId { get; init; }
-        public string Email { get; init; } = "";
-        public string FirstName { get; init; } = "";
-        public string LastName { get; init; } = "";
-        public string PasswordHash { get; init; } = "";
-        public int Semester { get; init; }
+        return Ok(new LoginResponse { UserId = Guid.Parse(userId!) });
     }
 }

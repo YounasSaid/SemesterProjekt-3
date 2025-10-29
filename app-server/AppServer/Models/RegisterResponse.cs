@@ -1,4 +1,6 @@
-﻿namespace AppServer.Models;
+﻿using System;
+
+namespace AppServer.Models;
 
     public class RegisterResponse
     {

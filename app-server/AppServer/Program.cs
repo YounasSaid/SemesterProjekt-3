@@ -1,17 +1,19 @@
 using AppServer.Components;
 using AppServer.Utils;
+using AppServer.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
-builder.Services.AddScoped<AppServer.Services.AuthUiService>();
+
 builder.Services.AddControllers();
-// gør HttpClient-factory tilgængelig
 builder.Services.AddHttpClient();
 
-// vores UI-service
-builder.Services.AddScoped<AppServer.Services.AuthUiService>();
+// Registrer services
+builder.Services.AddScoped<AuthUiService>();
+builder.Services.AddSingleton<UserGrpcClient>(); // ← TILFØJ DENNE
+builder.Services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
 
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
@@ -22,8 +24,6 @@ builder.Services.AddSession(options =>
     options.Cookie.IsEssential = true;
 });
 builder.Services.AddHttpContextAccessor();
-
-builder.Services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
 
 var app = builder.Build();
 
@@ -36,11 +36,9 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseAntiforgery();
-
 app.UseSession();
 
 app.MapControllers();
-
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
