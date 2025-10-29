@@ -1,11 +1,12 @@
-﻿@page "/login"
+@page "/login"
 @using AppServer.Models
 @inject AppServer.Services.AuthUiService Auth
 @inject NavigationManager Nav
+@rendermode InteractiveServer
 
 <h2>Log ind</h2>
 
-<EditForm Model="_m" OnValidSubmit="OnSubmit">
+<EditForm Model="_m" OnValidSubmit="OnSubmit" FormName="LoginForm">
     <DataAnnotationsValidator />
     <ValidationSummary />
 
@@ -29,7 +30,9 @@
 </EditForm>
 
 @code {
-    private readonly LoginRequest _m = new();
+    [SupplyParameterFromForm]
+    private LoginRequest _m { get; set; } = new();
+    
     private string? _error;
 
     private async Task OnSubmit()

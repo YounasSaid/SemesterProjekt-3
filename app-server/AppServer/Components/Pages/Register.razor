@@ -1,11 +1,12 @@
-﻿@page "/register"
+@page "/register"
 @using AppServer.Models
 @inject AppServer.Services.AuthUiService Auth
 @inject NavigationManager Nav
+@rendermode InteractiveServer
 
 <h2>Opret bruger</h2>
 
-<EditForm Model="_m" OnValidSubmit="OnSubmit">
+<EditForm Model="_m" OnValidSubmit="OnSubmit" FormName="RegisterForm">
     <DataAnnotationsValidator />
     <ValidationSummary />
 
@@ -34,7 +35,9 @@
 </EditForm>
 
 @code {
-    private readonly RegisterRequest _m = new() { Semester = 3 };
+    [SupplyParameterFromForm]
+    private RegisterRequest _m { get; set; } = new() { Semester = 3 };
+    
     private string? _msg, _error;
 
     private async Task OnSubmit()
