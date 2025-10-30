@@ -1,0 +1,35 @@
+syntax = "proto3";
+package user;
+
+option java_package = "com.semesterprojekt.proto.user";
+option java_multiple_files = true;
+option csharp_namespace = "SemesterProjekt.Proto.User";
+
+service UserService {
+  rpc CreateUser (CreateUserRequest) returns (CreateUserResponse);
+  rpc GetUserByEmail (GetUserByEmailRequest) returns (GetUserByEmailResponse);
+}
+
+message CreateUserRequest {
+  string email = 1;
+  string first_name = 2;
+  string last_name = 3;
+  string password_hash = 4;
+  int32 semester = 5;
+}
+
+message CreateUserResponse {
+  string user_id = 1;
+}
+
+message GetUserByEmailRequest {
+  string email = 1;
+}
+
+message GetUserByEmailResponse {
+  bool found = 1;
+  string user_id = 2;
+  string email = 3;
+  string password_hash = 4;
+  int32 semester = 5;
+}
