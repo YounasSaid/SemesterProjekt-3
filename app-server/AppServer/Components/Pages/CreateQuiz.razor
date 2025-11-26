@@ -1,0 +1,431 @@
+@page "/quiz/create"
+@using AppServer.Models
+@using AppServer.Utils
+@inject IHttpClientFactory HttpClientFactory
+@inject NavigationManager Nav
+@inject IHttpContextAccessor HttpContextAccessor
+@inject IJSRuntime JSRuntime
+@rendermode InteractiveServer
+
+<PageTitle>Opret Quiz</PageTitle>
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-10 mx-auto">
+            <h2 class="mb-3">Opret Ny Quiz</h2>
+            <p class="text-muted mb-4">
+                Opret en quiz med spørgsmål og svarmuligheder. Hvert korrekt svar giver 10 point.
+            </p>
+
+            @if (_errors.Any())
+            {
+                <div class="alert alert-danger">
+                    <h5>Der er følgende fejl:</h5>
+                    <ul>
+                        @foreach (var error in _errors)
+                        {
+                            <li>@error</li>
+                        }
+                    </ul>
+                </div>
+            }
+
+            <!-- Quiz Titel Section -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Quiz Titel</h5>
+                    <div class="mb-3">
+                        <input type="text" 
+                               class="form-control @(_titleError ? "is-invalid" : "")" 
+                               placeholder="Indtast quiz titel (3-200 karakterer)"
+                               @bind="_title" 
+                               @bind:event="oninput" />
+                        @if (_titleError)
+                        {
+                            <div class="invalid-feedback d-block">
+                                Titel skal være mellem 3 og 200 karakterer
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Spørgsmål Section -->
+            <h5 class="mb-3">Spørgsmål</h5>
+            
+            @for (int i = 0; i < _questions.Count; i++)
+            {
+                var questionIndex = i;
+                var question = _questions[i];
+                
+                <div class="card mb-3">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Spørgsmål @(questionIndex + 1)</h6>
+                        <button type="button" 
+                                class="btn btn-sm btn-danger" 
+                                @onclick="() => RemoveQuestion(questionIndex)"
+                                disabled="@_submitting">
+                            <i class="bi bi-trash"></i> Fjern spørgsmål
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <!-- Question Text -->
+                        <div class="mb-3">
+                            <label class="form-label">Spørgsmålstekst</label>
+                            <textarea class="form-control" 
+                                      rows="2"
+                                      placeholder="Indtast spørgsmålstekst (5-500 karakterer)"
+                                      @bind="question.QuestionText"
+                                      @bind:event="oninput"></textarea>
+                        </div>
+
+                        <!-- Options -->
+                        <label class="form-label">Svarmuligheder</label>
+                        @for (int j = 0; j < question.Options.Count; j++)
+                        {
+                            var optionIndex = j;
+                            var option = question.Options[j];
+                            
+                            <div class="input-group mb-2">
+                                <div class="input-group-text">
+                                    <input class="form-check-input mt-0" 
+                                           type="radio" 
+                                           name="correct_@questionIndex"
+                                           checked="@option.IsCorrect"
+                                           @onchange="() => ToggleCorrect(questionIndex, optionIndex)" />
+                                </div>
+                                <input type="text" 
+                                       class="form-control" 
+                                       placeholder="Svarmulighed @(optionIndex + 1)"
+                                       @bind="option.OptionText"
+                                       @bind:event="oninput" />
+                                @if (question.Options.Count > 2)
+                                {
+                                    <button class="btn btn-outline-danger" 
+                                            type="button"
+                                            @onclick="() => RemoveOption(questionIndex, optionIndex)"
+                                            disabled="@_submitting">
+                                        <i class="bi bi-x"></i>
+                                    </button>
+                                }
+                            </div>
+                        }
+
+                        <!-- Add Option Button -->
+                        <button type="button" 
+                                class="btn btn-sm btn-outline-primary mt-2" 
+                                @onclick="() => AddOption(questionIndex)"
+                                disabled="@(_submitting || question.Options.Count >= 6)">
+                            <i class="bi bi-plus-circle"></i> Tilføj svarmulighed
+                        </button>
+
+                        <!-- Question Validation Errors -->
+                        @if (question.ValidationError != null)
+                        {
+                            <div class="alert alert-warning mt-3 mb-0">
+                                @question.ValidationError
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            <!-- Add Question Button -->
+            <button type="button" 
+                    class="btn btn-primary mb-4" 
+                    @onclick="AddQuestion"
+                    disabled="@_submitting">
+                <i class="bi bi-plus-circle"></i> Tilføj spørgsmål
+            </button>
+
+            <!-- Submit Section -->
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex gap-2">
+                        <button type="button" 
+                                class="btn btn-success" 
+                                @onclick="ValidateAndSubmit"
+                                disabled="@_submitting">
+                            @if (_submitting)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                <span>Opretter...</span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-check-circle"></i>
+                                <span>Opret Quiz</span>
+                            }
+                        </button>
+                        <button type="button" 
+                                class="btn btn-secondary" 
+                                @onclick="HandleCancel"
+                                disabled="@_submitting">
+                            Annuller
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string _title = string.Empty;
+    private List<QuestionModel> _questions = new();
+    private bool _submitting = false;
+    private List<string> _errors = new();
+    private bool _titleError = false;
+
+    protected override void OnInitialized()
+    {
+        // Check authentication
+        var httpContext = HttpContextAccessor.HttpContext;
+        var userIdString = httpContext?.Session.GetString(SessionKeys.UserId);
+        
+        if (string.IsNullOrEmpty(userIdString))
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        // Initialize with one question
+        AddQuestion();
+    }
+
+    private void AddQuestion()
+    {
+        _questions.Add(new QuestionModel
+        {
+            QuestionText = string.Empty,
+            QuestionOrder = _questions.Count + 1,
+            Options = new List<OptionModel>
+            {
+                new() { OptionText = string.Empty, IsCorrect = false, OptionOrder = 1 },
+                new() { OptionText = string.Empty, IsCorrect = false, OptionOrder = 2 }
+            }
+        });
+    }
+
+    private void RemoveQuestion(int index)
+    {
+        _questions.RemoveAt(index);
+        
+        // Update question orders
+        for (int i = 0; i < _questions.Count; i++)
+        {
+            _questions[i].QuestionOrder = i + 1;
+        }
+    }
+
+    private void AddOption(int questionIndex)
+    {
+        var question = _questions[questionIndex];
+        
+        if (question.Options.Count >= 6)
+            return;
+
+        question.Options.Add(new OptionModel
+        {
+            OptionText = string.Empty,
+            IsCorrect = false,
+            OptionOrder = question.Options.Count + 1
+        });
+    }
+
+    private void RemoveOption(int questionIndex, int optionIndex)
+    {
+        var question = _questions[questionIndex];
+        
+        if (question.Options.Count <= 2)
+            return;
+
+        question.Options.RemoveAt(optionIndex);
+        
+        // Update option orders
+        for (int i = 0; i < question.Options.Count; i++)
+        {
+            question.Options[i].OptionOrder = i + 1;
+        }
+    }
+
+    private void ToggleCorrect(int questionIndex, int optionIndex)
+    {
+        var question = _questions[questionIndex];
+        
+        // Set all options to false
+        foreach (var option in question.Options)
+        {
+            option.IsCorrect = false;
+        }
+        
+        // Set selected option to true
+        question.Options[optionIndex].IsCorrect = true;
+    }
+
+    private async Task ValidateAndSubmit()
+    {
+        _errors.Clear();
+        _titleError = false;
+
+        // Clear previous question validation errors
+        foreach (var question in _questions)
+        {
+            question.ValidationError = null;
+        }
+
+        // Validate title
+        if (string.IsNullOrWhiteSpace(_title) || _title.Length < 3 || _title.Length > 200)
+        {
+            _errors.Add("Quiz titel skal være mellem 3 og 200 karakterer");
+            _titleError = true;
+        }
+
+        // Validate minimum questions
+        if (_questions.Count < 1)
+        {
+            _errors.Add("Mindst 1 spørgsmål er påkrævet");
+        }
+
+        // Validate each question
+        for (int i = 0; i < _questions.Count; i++)
+        {
+            var question = _questions[i];
+            var questionErrors = new List<string>();
+
+            // Validate question text
+            if (string.IsNullOrWhiteSpace(question.QuestionText) || 
+                question.QuestionText.Length < 5 || 
+                question.QuestionText.Length > 500)
+            {
+                questionErrors.Add("Spørgsmålstekst skal være mellem 5 og 500 karakterer");
+            }
+
+            // Validate options count
+            if (question.Options.Count < 2)
+            {
+                questionErrors.Add("Mindst 2 svarmuligheder er påkrævet");
+            }
+            else if (question.Options.Count > 6)
+            {
+                questionErrors.Add("Maksimum 6 svarmuligheder tilladt");
+            }
+
+            // Validate exactly one correct answer
+            var correctCount = question.Options.Count(o => o.IsCorrect);
+            if (correctCount != 1)
+            {
+                questionErrors.Add($"Præcis 1 svarmulighed skal være markeret som korrekt (fundet {correctCount})");
+            }
+
+            // Validate option texts
+            foreach (var option in question.Options)
+            {
+                if (string.IsNullOrWhiteSpace(option.OptionText) || 
+                    option.OptionText.Length < 1 || 
+                    option.OptionText.Length > 200)
+                {
+                    questionErrors.Add("Alle svarmuligheder skal være mellem 1 og 200 karakterer");
+                    break;
+                }
+            }
+
+            if (questionErrors.Any())
+            {
+                question.ValidationError = string.Join(" ", questionErrors);
+                _errors.Add($"Spørgsmål {i + 1}: {question.ValidationError}");
+            }
+        }
+
+        // If validation failed, return
+        if (_errors.Any())
+        {
+            StateHasChanged();
+            return;
+        }
+
+        // Submit to API
+        _submitting = true;
+        StateHasChanged();
+
+        try
+        {
+            var httpClient = HttpClientFactory.CreateClient();
+            httpClient.BaseAddress = new Uri(Nav.BaseUri);
+
+            var request = new CreateQuizRequest
+            {
+                Title = _title,
+                Questions = _questions.Select(q => new CreateQuizQuestionRequest
+                {
+                    QuestionText = q.QuestionText,
+                    QuestionOrder = q.QuestionOrder,
+                    Points = 10,
+                    Options = q.Options.Select(o => new CreateQuestionOptionRequest
+                    {
+                        OptionText = o.OptionText,
+                        IsCorrect = o.IsCorrect,
+                        OptionOrder = o.OptionOrder
+                    }).ToList()
+                }).ToList()
+            };
+
+            var response = await httpClient.PostAsJsonAsync("/api/quizmanagement/create", request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                // Navigate to myquizzes page on success
+                Nav.NavigateTo("/myquizzes", forceLoad: true);
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _errors.Add($"Fejl ved oprettelse af quiz: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _errors.Add($"Der opstod en fejl: {ex.Message}");
+        }
+        finally
+        {
+            _submitting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleCancel()
+    {
+        // Check if any data has been entered
+        bool hasData = !string.IsNullOrWhiteSpace(_title) || 
+                       _questions.Any(q => !string.IsNullOrWhiteSpace(q.QuestionText) || 
+                                          q.Options.Any(o => !string.IsNullOrWhiteSpace(o.OptionText)));
+
+        if (hasData)
+        {
+            bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", 
+                "Er du sikker på at du vil annullere? Alle ændringer vil gå tabt.");
+            
+            if (!confirmed)
+                return;
+        }
+
+        Nav.NavigateTo("/myquizzes", forceLoad: true);
+    }
+
+    // Model classes
+    private class QuestionModel
+    {
+        public string QuestionText { get; set; } = string.Empty;
+        public int QuestionOrder { get; set; }
+        public List<OptionModel> Options { get; set; } = new();
+        public string? ValidationError { get; set; }
+    }
+
+    private class OptionModel
+    {
+        public string OptionText { get; set; } = string.Empty;
+        public bool IsCorrect { get; set; }
+        public int OptionOrder { get; set; }
+    }
+}
