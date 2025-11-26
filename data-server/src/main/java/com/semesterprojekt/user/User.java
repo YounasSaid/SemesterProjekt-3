@@ -34,26 +34,26 @@ public class User {
 
   @Id
   @UuidGenerator
-  @Column(name = "id", nullable = false, updatable = false)
+  @Column(columnDefinition = "citext", name = "id", nullable = false, updatable = false)
   private UUID id;
 
-  @Column(name = "email", nullable = false)
+  @Column(columnDefinition = "citext", name = "email", nullable = false)
   private String email;
 
-  @Column(name = "first_name", nullable = false)
+  @Column(columnDefinition = "citext", name = "first_name", nullable = false)
   private String firstName;
 
-  @Column(name = "last_name", nullable = false)
+  @Column(columnDefinition = "citext", name = "last_name", nullable = false)
   private String lastName;
 
-  @Column(name = "password_hash", nullable = false)
+  @Column(columnDefinition = "citext", name = "password_hash", nullable = false)
   private String passwordHash;
 
-  @Column(name = "semester", nullable = false)
+  @Column(columnDefinition = "citext", name = "semester", nullable = false)
   private short semester;
 
   @CreationTimestamp
-  @Column(name = "created_at", nullable = false, updatable = false)
+  @Column(columnDefinition = "citext", name = "created_at", nullable = false, updatable = false)
   private OffsetDateTime createdAt;
 
   // --- getters/setters ---
