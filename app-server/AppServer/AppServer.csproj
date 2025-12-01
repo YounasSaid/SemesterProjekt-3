@@ -16,7 +16,8 @@
     </ItemGroup>
     
     <!-- Tilføj proto fil reference -->
-    <ItemGroup>
-        <Protobuf Include="Protos\quiz_service.proto" GrpcServices="Client" />
-    </ItemGroup>
+   <ItemGroup>
+    <Protobuf Include="Protos\user_service.proto" GrpcServices="Client" />
+    <Protobuf Include="Protos\quiz_service.proto" GrpcServices="Client" />
+</ItemGroup>
 </Project>

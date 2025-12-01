@@ -1,0 +1,22 @@
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Compiled class files
+*.class
+*.log
+*.jar
+*.war
+
+# OS
+.DS_Store
+Thumbs.db
