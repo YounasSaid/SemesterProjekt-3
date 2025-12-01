@@ -26,8 +26,18 @@
         <p class="text-danger">@_error</p>
     }
 
-    <button type="submit" class="btn btn-primary">Log ind</button>
-    <button type="button" class="btn btn-link" @onclick="GoRegister">Opret bruger</button>
+    <button type="submit" class="btn btn-primary" disabled="@_submitting">
+        @if (_submitting)
+        {
+            <span class="spinner-border spinner-border-sm me-2"></span>
+            <span>Logger ind...</span>
+        }
+        else
+        {
+            <span>Log ind</span>
+        }
+    </button>
+    <button type="button" class="btn btn-link" @onclick="GoRegister" disabled="@_submitting">Opret bruger</button>
 </EditForm>
 
 @code {
@@ -35,20 +45,57 @@
     private LoginRequest _m { get; set; } = new();
     
     private string? _error;
+    private bool _submitting = false;
 
     private async Task OnSubmit()
     {
-        var (ok, code) = await Auth.LoginAsync(_m);
-        if (ok)
+        if (_submitting) return;
+        
+        Console.WriteLine("🟢 LOGIN: Form submitted");
+        
+        _submitting = true;
+        _error = null;
+        StateHasChanged();
+        
+        try
         {
-            // Use JavaScript to force a full page reload with cookies
-            await JSRuntime.InvokeVoidAsync("eval", "window.location.href = '/myquizzes'");
+            var (ok, code) = await Auth.LoginAsync(_m);
+            
+            Console.WriteLine($"📨 LOGIN: Response ok={ok}, code={code}");
+            
+            if (ok)
+            {
+                Console.WriteLine("✅ LOGIN: Success - navigating to /myquizzes");
+                
+                // Try multiple navigation methods
+                try
+                {
+                    // Method 1: Direct window.location (most reliable)
+                    await JSRuntime.InvokeVoidAsync("eval", "window.location = 'http://localhost:5126/myquizzes';");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"⚠️ JS navigation failed: {ex.Message}");
+                    // Method 2: Fallback to NavigationManager with forceLoad
+                    Nav.NavigateTo("/myquizzes", forceLoad: true);
+                }
+            }
+            else
+            {
+                Console.WriteLine($"❌ LOGIN: Failed - {code}");
+                _error = code is "INVALID_CREDENTIALS"
+                    ? "Forkert email eller adgangskode."
+                    : "Noget gik galt.";
+                _submitting = false;
+                StateHasChanged();
+            }
         }
-        else
+        catch (Exception ex)
         {
-            _error = code is "INVALID_CREDENTIALS"
-                ? "Forkert email eller adgangskode."
-                : "Noget gik galt.";
+            Console.WriteLine($"💥 LOGIN: Exception - {ex.Message}");
+            _error = "Der opstod en fejl. Prøv igen.";
+            _submitting = false;
+            StateHasChanged();
         }
     }
 

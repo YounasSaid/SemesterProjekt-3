@@ -70,8 +70,15 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest req)
     {
+        Console.WriteLine("========================================");
+        Console.WriteLine($"🔵 LOGIN REQUEST: {req.SchoolEmail}");
+        Console.WriteLine("========================================");
+        
         if (!ModelState.IsValid)
+        {
+            Console.WriteLine("❌ MODEL STATE INVALID");
             return ValidationProblem(ModelState);
+        }
 
         try
         {
@@ -82,14 +89,37 @@ public class AuthController : ControllerBase
             var grpcResponse = await _userClient.GetUserByEmailAsync(grpcRequest);
 
             if (!grpcResponse.Found)
+            {
+                Console.WriteLine($"❌ USER NOT FOUND: {email}");
                 return Unauthorized(new { code = "INVALID_CREDENTIALS" });
+            }
 
             // Verificer password
             if (!_hasher.Verify(req.Password, grpcResponse.PasswordHash))
+            {
+                Console.WriteLine($"❌ WRONG PASSWORD: {email}");
                 return Unauthorized(new { code = "INVALID_CREDENTIALS" });
+            }
+
+            // CRITICAL: Load session first to establish it
+            var existingSessionId = HttpContext.Session.Id;
+            Console.WriteLine($"📝 Session before setting UserId: {existingSessionId}");
 
             // Gem bruger-id i session
             HttpContext.Session.SetString(SessionKeys.UserId, grpcResponse.UserId);
+            
+            // CRITICAL: Commit session changes immediately
+            await HttpContext.Session.CommitAsync();
+            
+            // Verify session was set
+            var sessionTest = HttpContext.Session.GetString(SessionKeys.UserId);
+            var finalSessionId = HttpContext.Session.Id;
+            
+            Console.WriteLine($"✅ LOGIN SUCCESS!");
+            Console.WriteLine($"   SessionId: {finalSessionId}");
+            Console.WriteLine($"   UserId: {sessionTest}");
+            Console.WriteLine($"   Session Cookie: {HttpContext.Response.Headers["Set-Cookie"]}");
+            Console.WriteLine("========================================");
 
             return Ok(new LoginResponse 
             { 
@@ -98,11 +128,13 @@ public class AuthController : ControllerBase
         }
         catch (Grpc.Core.RpcException ex) when (ex.StatusCode == Grpc.Core.StatusCode.NotFound)
         {
+            Console.WriteLine($"❌ GRPC NOT FOUND: {ex.Message}");
             return Unauthorized(new { code = "INVALID_CREDENTIALS" });
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error: {ex.Message}");
+            Console.WriteLine($"💥 LOGIN ERROR: {ex.Message}");
+            Console.WriteLine($"   Stack: {ex.StackTrace}");
             return StatusCode(500, new { code = "SERVER_ERROR" });
         }
     }

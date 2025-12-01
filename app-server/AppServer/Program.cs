@@ -1,6 +1,7 @@
 using AppServer.Components;
 using AppServer.Utils;
 using AppServer.Services;
+using Microsoft.AspNetCore.Http;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,7 +10,16 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddControllers();
 
-// Configure HttpClient to share cookies with Blazor Server
+// Configure HttpClient with cookie handling
+builder.Services.AddHttpClient("default", client =>
+{
+    // This HttpClient will use the same cookies as the browser
+}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+{
+    UseCookies = true,
+    CookieContainer = new System.Net.CookieContainer()
+});
+
 builder.Services.AddHttpClient();
 
 // Registrer services
@@ -25,7 +35,9 @@ builder.Services.AddSession(options =>
     options.IdleTimeout = TimeSpan.FromHours(8);
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
-    options.Cookie.SameSite = SameSiteMode.Lax; // Allow cookie to be sent with API requests
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.None; // Allow HTTP for localhost
+    options.Cookie.Path = "/";
 });
 builder.Services.AddHttpContextAccessor();
 
@@ -37,10 +49,13 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
 app.UseStaticFiles();
+
+// CRITICAL: Proper middleware order for session
+app.UseRouting();
+app.UseSession(); // Must be after UseRouting and before endpoints
+
 app.UseAntiforgery();
-app.UseSession(); // IMPORTANT: Session must come BEFORE MapControllers
 
 app.MapControllers();
 app.MapRazorComponents<App>()
