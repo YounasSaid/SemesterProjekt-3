@@ -1,0 +1,26 @@
+syntax = "proto3";
+package quiz;
+
+option java_package = "com.semesterprojekt.proto.quiz";
+option java_multiple_files = true;
+option csharp_namespace = "SemesterProjekt.Proto.Quiz";
+
+service QuizService
+{
+    rpc CreateQuiz (CreateQuizRequest) returns (CreateQuizRespond);
+}
+
+message CreateQuizRequest {
+    string title = 1;
+    repeated Question questions = 2;
+}
+
+message CreateQuizRespond {
+    string quiz_id = 1;
+}
+
+message Question {
+    string text = 1;
+    repeated string answer_options = 2;
+    int32 correct_option_index = 3;
+}
