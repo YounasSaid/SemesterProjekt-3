@@ -33,3 +33,4 @@ message GetUserByEmailResponse {
   string password_hash = 4;
   int32 semester = 5;
 }
+//commit
