@@ -8,8 +8,8 @@ import java.util.UUID;
 
 public interface QuizRepository extends JpaRepository<QuizEntity, UUID> {
 
-  Optional<QuizEntity> findByTitleIgnoreCase(String title);
+  Optional<QuizEntity> findById(UUID id);
 
-  // Required by: GetUserQuizzesRequest (proto)
-  List<QuizEntity> findByCreatedBy(String createdBy);
+  List<QuizEntity> findByCreatedBy(UUID createdBy);
 }
+

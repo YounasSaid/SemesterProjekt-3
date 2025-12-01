@@ -32,7 +32,7 @@ public class QuizService {
 
     QuizEntity quiz = new QuizEntity();
     quiz.setTitle(request.getTitle());
-    quiz.setCreatedBy(request.getCreatedBy());
+    quiz.setCreatedBy(UUID.fromString(request.getCreatedBy())); // <-- FIX
 
     // For each proto question → JPA Question entity
     for (CreateQuizQuestion qReq : request.getQuestionsList()) {
@@ -75,7 +75,7 @@ public class QuizService {
    */
   @Transactional(readOnly = true)
   public java.util.List<QuizEntity> getUserQuizzes(String userId) {
-    return quizRepository.findByCreatedBy(userId);
+    return quizRepository.findByCreatedBy(UUID.fromString(userId));
   }
 
   /**

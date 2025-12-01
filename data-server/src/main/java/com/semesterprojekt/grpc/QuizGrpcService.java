@@ -135,7 +135,8 @@ public class QuizGrpcService extends QuizServiceGrpc.QuizServiceImplBase {
       StreamObserver<GetQuizResponse> responseObserver) {
 
     try {
-      QuizEntity quiz = quizService.getQuiz(UUID.fromString(request.getQuizId()));
+      UUID quizId = UUID.fromString(request.getQuizId());
+      QuizEntity quiz = quizService.getQuiz(quizId);
 
       if (quiz == null) {
         responseObserver.onNext(
@@ -151,7 +152,7 @@ public class QuizGrpcService extends QuizServiceGrpc.QuizServiceImplBase {
           .setFound(true)
           .setQuizId(quiz.getId().toString())
           .setTitle(quiz.getTitle())
-          .setCreatedBy(quiz.getCreatedBy());
+          .setCreatedBy(quiz.getCreatedBy().toString()); // <-- UUID to string
 
       for (Question q : quiz.getQuestions()) {
         QuizQuestion.Builder qBuilder = QuizQuestion.newBuilder()
@@ -182,6 +183,7 @@ public class QuizGrpcService extends QuizServiceGrpc.QuizServiceImplBase {
       );
     }
   }
+
 
   // ----------------------
   // Submit Quiz

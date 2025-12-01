@@ -30,8 +30,8 @@ public class QuizEntity
   @Column(columnDefinition = "citext", name = "title", nullable = false)
   private String title;
 
-  @Column(columnDefinition = "citext", name = "created_by", nullable = false)
-  private String createdBy;
+  @Column(columnDefinition = "uuid", name = "created_by", nullable = false)
+  private UUID createdBy;
 
   @CreationTimestamp
   @Column(columnDefinition = "citext", name = "created_at", nullable = false, updatable = false)
@@ -47,8 +47,8 @@ public class QuizEntity
   public String getTitle() { return title; }
   public void setTitle(String title) { this.title = title; }
 
-  public String getCreatedBy() { return createdBy; }
-  public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
+  public UUID getCreatedBy() { return createdBy; }
+  public void setCreatedBy(UUID createdBy) { this.createdBy = createdBy; }
 
   public OffsetDateTime getCreatedAt() { return createdAt; }
   public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
