@@ -1,9 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Components;   // <-- for NavigationManager
+using Microsoft.AspNetCore.Components;
 using AppServer.Models;
 
 namespace AppServer.Services;
@@ -15,7 +15,6 @@ public class AuthUiService
     public AuthUiService(IHttpClientFactory factory, NavigationManager nav)
     {
         _http = factory.CreateClient();
-        // Sæt base address til den kørende apps base-URL (virker i dev uden at hardcode porte)
         _http.BaseAddress = new Uri(nav.BaseUri);
     }
 

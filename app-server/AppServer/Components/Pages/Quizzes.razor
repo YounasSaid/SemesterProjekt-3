@@ -1,0 +1,10 @@
+@page "/quizzes"
+@inject NavigationManager Nav
+
+@code {
+    protected override void OnInitialized()
+    {
+        // Redirect to /myquizzes
+        Nav.NavigateTo("/myquizzes", forceLoad: true);
+    }
+}
