@@ -18,7 +18,6 @@ public class AuthController : ControllerBase
     {
         _hasher = hasher;
         
-        // Opret gRPC connection til data-server
         _grpcChannel = GrpcChannel.ForAddress("http://localhost:9090");
         _userClient = new UserService.UserServiceClient(_grpcChannel);
     }
@@ -29,16 +28,13 @@ public class AuthController : ControllerBase
         if (!ModelState.IsValid)
             return ValidationProblem(ModelState);
 
-        // Kun semester 3 er tilladt i denne POC
         if (req.Semester != 3)
             return BadRequest(new { code = "INVALID_SEMESTER" });
 
         try
         {
-            // Hash password
             var passwordHash = _hasher.Hash(req.Password);
 
-            // Opret gRPC request
             var grpcRequest = new CreateUserRequest
             {
                 Email = req.SchoolEmail.Trim().ToLowerInvariant(),
@@ -48,7 +44,6 @@ public class AuthController : ControllerBase
                 Semester = req.Semester
             };
 
-            // Kald data-server via gRPC
             var grpcResponse = await _userClient.CreateUserAsync(grpcRequest);
 
             return StatusCode(201, new RegisterResponse 
@@ -62,7 +57,7 @@ public class AuthController : ControllerBase
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error: {ex.Message}");
+            Console.WriteLine($"Register Error: {ex.Message}");
             return StatusCode(500, new { code = "SERVER_ERROR" });
         }
     }
@@ -70,56 +65,25 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest req)
     {
-        Console.WriteLine("========================================");
-        Console.WriteLine($"🔵 LOGIN REQUEST: {req.SchoolEmail}");
-        Console.WriteLine("========================================");
-        
         if (!ModelState.IsValid)
-        {
-            Console.WriteLine("❌ MODEL STATE INVALID");
             return ValidationProblem(ModelState);
-        }
 
         try
         {
             var email = req.SchoolEmail.Trim().ToLowerInvariant();
 
-            // Hent bruger fra data-server via gRPC
             var grpcRequest = new GetUserByEmailRequest { Email = email };
             var grpcResponse = await _userClient.GetUserByEmailAsync(grpcRequest);
 
             if (!grpcResponse.Found)
-            {
-                Console.WriteLine($"❌ USER NOT FOUND: {email}");
                 return Unauthorized(new { code = "INVALID_CREDENTIALS" });
-            }
 
-            // Verificer password
             if (!_hasher.Verify(req.Password, grpcResponse.PasswordHash))
-            {
-                Console.WriteLine($"❌ WRONG PASSWORD: {email}");
                 return Unauthorized(new { code = "INVALID_CREDENTIALS" });
-            }
 
-            // CRITICAL: Load session first to establish it
-            var existingSessionId = HttpContext.Session.Id;
-            Console.WriteLine($"📝 Session before setting UserId: {existingSessionId}");
-
-            // Gem bruger-id i session
+            // Set session
             HttpContext.Session.SetString(SessionKeys.UserId, grpcResponse.UserId);
-            
-            // CRITICAL: Commit session changes immediately
             await HttpContext.Session.CommitAsync();
-            
-            // Verify session was set
-            var sessionTest = HttpContext.Session.GetString(SessionKeys.UserId);
-            var finalSessionId = HttpContext.Session.Id;
-            
-            Console.WriteLine($"✅ LOGIN SUCCESS!");
-            Console.WriteLine($"   SessionId: {finalSessionId}");
-            Console.WriteLine($"   UserId: {sessionTest}");
-            Console.WriteLine($"   Session Cookie: {HttpContext.Response.Headers["Set-Cookie"]}");
-            Console.WriteLine("========================================");
 
             return Ok(new LoginResponse 
             { 
@@ -128,13 +92,11 @@ public class AuthController : ControllerBase
         }
         catch (Grpc.Core.RpcException ex) when (ex.StatusCode == Grpc.Core.StatusCode.NotFound)
         {
-            Console.WriteLine($"❌ GRPC NOT FOUND: {ex.Message}");
             return Unauthorized(new { code = "INVALID_CREDENTIALS" });
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"💥 LOGIN ERROR: {ex.Message}");
-            Console.WriteLine($"   Stack: {ex.StackTrace}");
+            Console.WriteLine($"Login Error: {ex.Message}");
             return StatusCode(500, new { code = "SERVER_ERROR" });
         }
     }

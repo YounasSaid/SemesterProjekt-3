@@ -21,14 +21,12 @@
                 
                 @if (IsAuthenticated)
                 {
-                    <!-- Mine Quizzer Link -->
                     <li class="nav-item">
                         <NavLink class="nav-link" href="myquizzes">
                             <span class="bi bi-folder-fill" aria-hidden="true"></span> Mine Quizzer
                         </NavLink>
                     </li>
                     
-                    <!-- Opret Quiz Link -->
                     <li class="nav-item">
                         <NavLink class="nav-link" href="quiz/create">
                             <span class="bi bi-plus-circle-fill" aria-hidden="true"></span> Opret Quiz
@@ -37,7 +35,6 @@
                 }
             </ul>
             
-            <!-- Right-aligned items -->
             <ul class="navbar-nav">
                 @if (IsAuthenticated)
                 {
@@ -85,20 +82,14 @@
                 var httpContext = HttpContextAccessor.HttpContext;
                 if (httpContext == null)
                 {
-                    Console.WriteLine("⚠️ MainLayout: HttpContext is NULL");
                     return false;
                 }
                 
-                var sessionId = httpContext.Session.Id;
                 var userIdString = httpContext.Session.GetString(SessionKeys.UserId);
-                
-                Console.WriteLine($"🔍 MainLayout: SessionId={sessionId}, UserId={userIdString ?? "NULL"}");
-                
                 return !string.IsNullOrEmpty(userIdString);
             }
-            catch (Exception ex)
+            catch
             {
-                Console.WriteLine($"💥 MainLayout: Exception - {ex.Message}");
                 return false;
             }
         }

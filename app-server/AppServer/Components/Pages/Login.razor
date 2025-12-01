@@ -7,27 +7,27 @@
 
 <h2>Log ind</h2>
 
-<EditForm Model="_m" OnValidSubmit="OnSubmit" FormName="LoginForm">
+<EditForm Model="model" OnValidSubmit="OnSubmit" FormName="LoginForm">
     <DataAnnotationsValidator />
     <ValidationSummary />
 
     <div class="mb-2">
         <label>Skolemail</label><br />
-        <InputText class="form-control" @bind-Value="_m.SchoolEmail" />
+        <InputText class="form-control" @bind-Value="model.SchoolEmail" />
     </div>
 
     <div class="mb-2">
         <label>Password</label><br />
-        <InputText class="form-control" type="password" @bind-Value="_m.Password" />
+        <InputText class="form-control" type="password" @bind-Value="model.Password" />
     </div>
 
-    @if (!string.IsNullOrEmpty(_error))
+    @if (!string.IsNullOrEmpty(error))
     {
-        <p class="text-danger">@_error</p>
+        <p class="text-danger">@error</p>
     }
 
-    <button type="submit" class="btn btn-primary" disabled="@_submitting">
-        @if (_submitting)
+    <button type="submit" class="btn btn-primary" disabled="@submitting">
+        @if (submitting)
         {
             <span class="spinner-border spinner-border-sm me-2"></span>
             <span>Logger ind...</span>
@@ -37,64 +37,46 @@
             <span>Log ind</span>
         }
     </button>
-    <button type="button" class="btn btn-link" @onclick="GoRegister" disabled="@_submitting">Opret bruger</button>
+    <button type="button" class="btn btn-link" @onclick="GoRegister" disabled="@submitting">Opret bruger</button>
 </EditForm>
 
 @code {
     [SupplyParameterFromForm]
-    private LoginRequest _m { get; set; } = new();
+    private LoginRequest model { get; set; } = new();
     
-    private string? _error;
-    private bool _submitting = false;
+    private string? error;
+    private bool submitting = false;
 
     private async Task OnSubmit()
     {
-        if (_submitting) return;
+        if (submitting) return;
         
-        Console.WriteLine("🟢 LOGIN: Form submitted");
-        
-        _submitting = true;
-        _error = null;
+        submitting = true;
+        error = null;
         StateHasChanged();
         
         try
         {
-            var (ok, code) = await Auth.LoginAsync(_m);
-            
-            Console.WriteLine($"📨 LOGIN: Response ok={ok}, code={code}");
+            var (ok, code) = await Auth.LoginAsync(model);
             
             if (ok)
             {
-                Console.WriteLine("✅ LOGIN: Success - navigating to /myquizzes");
-                
-                // Try multiple navigation methods
-                try
-                {
-                    // Method 1: Direct window.location (most reliable)
-                    await JSRuntime.InvokeVoidAsync("eval", "window.location = 'http://localhost:5126/myquizzes';");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"⚠️ JS navigation failed: {ex.Message}");
-                    // Method 2: Fallback to NavigationManager with forceLoad
-                    Nav.NavigateTo("/myquizzes", forceLoad: true);
-                }
+                await Task.Delay(100);
+                Nav.NavigateTo("/myquizzes", forceLoad: true);
             }
             else
             {
-                Console.WriteLine($"❌ LOGIN: Failed - {code}");
-                _error = code is "INVALID_CREDENTIALS"
+                error = code is "INVALID_CREDENTIALS"
                     ? "Forkert email eller adgangskode."
                     : "Noget gik galt.";
-                _submitting = false;
+                submitting = false;
                 StateHasChanged();
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"💥 LOGIN: Exception - {ex.Message}");
-            _error = "Der opstod en fejl. Prøv igen.";
-            _submitting = false;
+            error = "Der opstod en fejl. Prøv igen.";
+            submitting = false;
             StateHasChanged();
         }
     }
