@@ -5,22 +5,119 @@ option java_package = "com.semesterprojekt.proto.quiz";
 option java_multiple_files = true;
 option csharp_namespace = "SemesterProjekt.Proto.Quiz";
 
-service QuizService
-{
-    rpc CreateQuiz (CreateQuizRequest) returns (CreateQuizRespond);
+service QuizService {
+    rpc CreateQuiz (CreateQuizRequest) returns (CreateQuizResponse);
+    rpc DeleteQuiz (DeleteQuizRequest) returns (DeleteQuizResponse);
+    rpc GetUserQuizzes (GetUserQuizzesRequest) returns (GetUserQuizzesResponse);
+    rpc GetQuiz (GetQuizRequest) returns (GetQuizResponse);
+    rpc SubmitQuiz (SubmitQuizRequest) returns (SubmitQuizResponse);
 }
 
+// Create Quiz Messages
 message CreateQuizRequest {
-    string title = 1;
-    repeated Question questions = 2;
+    string created_by = 1;
+    string title = 2;
+    repeated CreateQuizQuestion questions = 3;
 }
 
-message CreateQuizRespond {
+message CreateQuizQuestion {
+    string question_text = 1;
+    int32 question_order = 2;
+    int32 points = 3;
+    repeated CreateQuestionOption options = 4;
+}
+
+message CreateQuestionOption {
+    string option_text = 1;
+    bool is_correct = 2;
+    int32 option_order = 3;
+}
+
+message CreateQuizResponse {
+    bool success = 1;
+    string quiz_id = 2;
+    string title = 3;
+    int32 question_count = 4;
+    int32 total_points = 5;
+    string error_message = 6;
+}
+
+// Delete Quiz Messages
+message DeleteQuizRequest {
+    string user_id = 1;
+    string quiz_id = 2;
+}
+
+message DeleteQuizResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+// Get User Quizzes Messages
+message GetUserQuizzesRequest {
+    string user_id = 1;
+}
+
+message GetUserQuizzesResponse {
+    repeated QuizSummary quizzes = 1;
+}
+
+message QuizSummary {
+    string quiz_id = 1;
+    string title = 2;
+    int32 question_count = 3;
+    int32 total_points = 4;
+    string created_at = 5;
+}
+
+// Get Quiz Messages (for playing quiz)
+message GetQuizRequest {
     string quiz_id = 1;
 }
 
-message Question {
-    string text = 1;
-    repeated string answer_options = 2;
-    int32 correct_option_index = 3;
+message GetQuizResponse {
+    bool found = 1;
+    string quiz_id = 2;
+    string title = 3;
+    string created_by = 4;
+    repeated QuizQuestion questions = 5;
+}
+
+message QuizQuestion {
+    string question_id = 1;
+    string question_text = 2;
+    int32 question_order = 3;
+    int32 points = 4;
+    repeated QuestionOption options = 5;
+}
+
+message QuestionOption {
+    string option_id = 1;
+    string option_text = 2;
+    int32 option_order = 3;
+}
+
+// Submit Quiz Messages
+message SubmitQuizRequest {
+    string quiz_id = 1;
+    string user_id = 2;
+    repeated QuizAnswer answers = 3;
+}
+
+message QuizAnswer {
+    string question_id = 1;
+    string selected_option_id = 2;
+}
+
+message SubmitQuizResponse {
+    bool success = 1;
+    int32 score = 2;
+    int32 total_points = 3;
+    repeated AnswerResult results = 4;
+}
+
+message AnswerResult {
+    string question_id = 1;
+    bool is_correct = 2;
+    int32 points_earned = 3;
 }

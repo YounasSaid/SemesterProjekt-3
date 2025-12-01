@@ -16,16 +16,11 @@ import java.util.UUID;
  *   Represents a quiz in the database.
  *
  * Stored in table: "quizzes"
- *
- * Fields:
- *   - id: Primary key (UUID generated)
- *   - title: Quiz name
- *   - createdAt: Timestamp of creation
- *   - questions: One-to-many relation to Question
  */
 @Entity
 @Table(name = "quizzes")
-public class Quiz {
+public class QuizEntity
+{
 
   @Id
   @UuidGenerator
@@ -35,6 +30,9 @@ public class Quiz {
   @Column(columnDefinition = "citext", name = "title", nullable = false)
   private String title;
 
+  @Column(columnDefinition = "citext", name = "created_by", nullable = false)
+  private String createdBy;
+
   @CreationTimestamp
   @Column(columnDefinition = "citext", name = "created_at", nullable = false, updatable = false)
   private OffsetDateTime createdAt;
@@ -42,13 +40,15 @@ public class Quiz {
   @OneToMany(mappedBy = "quiz", cascade = CascadeType.ALL, orphanRemoval = true)
   private List<Question> questions = new ArrayList<>();
 
-  // --- getters/setters ---
-
+  // ---- getters & setters ----
   public UUID getId() { return id; }
   public void setId(UUID id) { this.id = id; }
 
   public String getTitle() { return title; }
   public void setTitle(String title) { this.title = title; }
+
+  public String getCreatedBy() { return createdBy; }
+  public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
 
   public OffsetDateTime getCreatedAt() { return createdAt; }
   public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
