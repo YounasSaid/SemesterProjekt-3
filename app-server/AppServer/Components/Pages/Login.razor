@@ -2,6 +2,7 @@
 @using AppServer.Models
 @inject AppServer.Services.AuthUiService Auth
 @inject NavigationManager Nav
+@inject IJSRuntime JSRuntime
 @rendermode InteractiveServer
 
 <h2>Log ind</h2>
@@ -40,7 +41,8 @@
         var (ok, code) = await Auth.LoginAsync(_m);
         if (ok)
         {
-            Nav.NavigateTo("/");
+            // Use JavaScript to force a full page reload with cookies
+            await JSRuntime.InvokeVoidAsync("eval", "window.location.href = '/myquizzes'");
         }
         else
         {
