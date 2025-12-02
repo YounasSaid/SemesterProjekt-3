@@ -1,6 +1,5 @@
-﻿@page "/Error"
+@page "/Error"
 @using System.Diagnostics
-@using Microsoft.AspNetCore.Http
 
 <PageTitle>Error</PageTitle>
 
@@ -27,11 +26,13 @@
 
 @code{
     [CascadingParameter]
-    private HttpContext? HttpContext { get; set; }
+    private Microsoft.AspNetCore.Http.HttpContext? HttpContext { get; set; }
 
     private string? RequestId { get; set; }
     private bool ShowRequestId => !string.IsNullOrEmpty(RequestId);
 
-    protected override void OnInitialized() =>
+    protected override void OnInitialized()
+    {
         RequestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+    }
 }

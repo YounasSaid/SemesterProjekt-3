@@ -26,12 +26,16 @@ public class AuthUiService
         return (false, err);
     }
 
-    public async Task<(bool ok, string? code)> LoginAsync(LoginRequest req)
+    public async Task<(bool ok, string? code, string? userId)> LoginAsync(LoginRequest req)
     {
         var resp = await _http.PostAsJsonAsync("/api/auth/login", req);
-        if (resp.IsSuccessStatusCode) return (true, null);
+        if (resp.IsSuccessStatusCode)
+        {
+            var loginResponse = await resp.Content.ReadFromJsonAsync<LoginResponse>();
+            return (true, null, loginResponse?.UserId.ToString());
+        }
         var err = await TryReadError(resp);
-        return (false, err);
+        return (false, err, null);
     }
 
     private static async Task<string?> TryReadError(HttpResponseMessage resp)

@@ -1,9 +1,10 @@
 @page "/myquizzes"
 @using AppServer.Models
 @using AppServer.Utils
+@using AppServer.Services
 @inject IHttpClientFactory HttpClientFactory
 @inject NavigationManager Nav
-@inject IHttpContextAccessor HttpContextAccessor
+@inject SimpleAuthService AuthService
 @inject IJSRuntime JSRuntime
 @rendermode InteractiveServer
 
@@ -202,13 +203,17 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // Check authentication
-        var httpContext = HttpContextAccessor.HttpContext;
-        var userIdString = httpContext?.Session.GetString(SessionKeys.UserId);
+        Console.WriteLine("=== MYQUIZZES: OnInitializedAsync START ===");
+        
+        // Read userId from AuthService (SIMPLE - no Circuit ID!)
+        var userIdString = AuthService.GetUserId();
+        
+        Console.WriteLine($"🔍 MYQUIZZES: UserId={userIdString ?? "NULL"}");
         
         if (string.IsNullOrEmpty(userIdString))
         {
-            Nav.NavigateTo("/login", forceLoad: true);
+            Console.WriteLine("❌ MYQUIZZES: No userId - redirecting to login");
+            Nav.NavigateTo("/login");
             return;
         }
 
@@ -237,7 +242,7 @@
             }
             else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
-                Nav.NavigateTo("/login", forceLoad: true);
+                Nav.NavigateTo("/login");
                 return;
             }
             else

@@ -6,19 +6,19 @@
 
 <h2>Opret bruger</h2>
 
-<EditForm Model="_m" OnValidSubmit="OnSubmit" FormName="RegisterForm">
+<EditForm Model="model" OnValidSubmit="OnSubmit" FormName="RegisterForm">
     <DataAnnotationsValidator />
     <ValidationSummary />
 
-    <div class="mb-2"><label>Fornavn</label><br /><InputText class="form-control" @bind-Value="_m.FirstName" /></div>
-    <div class="mb-2"><label>Efternavn</label><br /><InputText class="form-control" @bind-Value="_m.LastName" /></div>
-    <div class="mb-2"><label>Skolemail</label><br /><InputText class="form-control" @bind-Value="_m.SchoolEmail" /></div>
-    <div class="mb-2"><label>Password</label><br /><InputText class="form-control" type="password" @bind-Value="_m.Password" />
+    <div class="mb-2"><label>Fornavn</label><br /><InputText class="form-control" @bind-Value="model.FirstName" /></div>
+    <div class="mb-2"><label>Efternavn</label><br /><InputText class="form-control" @bind-Value="model.LastName" /></div>
+    <div class="mb-2"><label>Skolemail</label><br /><InputText class="form-control" @bind-Value="model.SchoolEmail" /></div>
+    <div class="mb-2"><label>Password</label><br /><InputText class="form-control" type="password" @bind-Value="model.Password" />
     </div>
 
     <div class="mb-2">
         <label>Semester</label><br />
-        <InputSelect class="form-select" @bind-Value="_m.Semester">
+        <InputSelect class="form-select" @bind-Value="model.Semester">
             @for (int i = 1; i <= 7; i++)
             {
                 <option value="@i" disabled="@(i != 3)">@i</option>
@@ -27,8 +27,8 @@
         <small>(Kun 3 er tilladt i POC)</small>
     </div>
 
-    @if (!string.IsNullOrEmpty(_msg)) { <p class="text-success">@_msg</p> }
-    @if (!string.IsNullOrEmpty(_error)) { <p class="text-danger">@_error</p> }
+    @if (!string.IsNullOrEmpty(msg)) { <p class="text-success">@msg</p> }
+    @if (!string.IsNullOrEmpty(error)) { <p class="text-danger">@error</p> }
 
     <button class="btn btn-primary" type="submit">Opret</button>
     <button class="btn btn-link" type="button" @onclick="GoLogin">Til login</button>
@@ -36,22 +36,23 @@
 
 @code {
     [SupplyParameterFromForm]
-    private RegisterRequest _m { get; set; } = new() { Semester = 3 };
+    private RegisterRequest model { get; set; } = new() { Semester = 3 };
     
-    private string? _msg, _error;
+    private string? msg;
+    private string? error;
 
     private async Task OnSubmit()
     {
-        var (ok, code) = await Auth.RegisterAsync(_m);
+        var (ok, code) = await Auth.RegisterAsync(model);
         if (ok)
         {
-            _msg = "Bruger oprettet – log ind";
+            msg = "Bruger oprettet – log ind";
             await Task.Delay(800);
             Nav.NavigateTo("/login");
         }
         else
         {
-            _error = code switch
+            error = code switch
             {
                 "INVALID_Semester" => "Kun semester 3 er tilladt i denne POC.",
                 "EMAIL_TAKEN"      => "Mailen er allerede brugt.",

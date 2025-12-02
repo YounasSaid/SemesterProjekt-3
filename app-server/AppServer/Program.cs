@@ -1,6 +1,7 @@
 using AppServer.Components;
 using AppServer.Utils;
 using AppServer.Services;
+using Microsoft.AspNetCore.Components.Server.Circuits;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +18,11 @@ builder.Services.AddScoped<AuthUiService>();
 builder.Services.AddSingleton<UserGrpcClient>();
 builder.Services.AddSingleton<QuizGrpcClient>();
 builder.Services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
+
+// SIMPLE AUTH - Clean approach (NO Circuit ID tracking needed!)
+builder.Services.AddSingleton<SimpleAuthService>();
+builder.Services.AddScoped<SimpleCircuitHandler>();
+builder.Services.AddScoped<CircuitHandler>(sp => sp.GetRequiredService<SimpleCircuitHandler>());
 
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>

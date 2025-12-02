@@ -21,14 +21,12 @@
                 
                 @if (IsAuthenticated)
                 {
-                    <!-- Mine Quizzer Link -->
                     <li class="nav-item">
                         <NavLink class="nav-link" href="myquizzes">
                             <span class="bi bi-folder-fill" aria-hidden="true"></span> Mine Quizzer
                         </NavLink>
                     </li>
                     
-                    <!-- Opret Quiz Link -->
                     <li class="nav-item">
                         <NavLink class="nav-link" href="quiz/create">
                             <span class="bi bi-plus-circle-fill" aria-hidden="true"></span> Opret Quiz
@@ -37,7 +35,6 @@
                 }
             </ul>
             
-            <!-- Right-aligned items -->
             <ul class="navbar-nav">
                 @if (IsAuthenticated)
                 {
@@ -64,73 +61,6 @@
         </div>
     </div>
 </nav>
-
-<!-- ALTERNATIVE VERSION WITH DROPDOWN (Uncomment to use)
-<nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-3">
-    <div class="container-fluid">
-        <NavLink class="navbar-brand" href="/" Match="NavLinkMatch.All">
-            <span class="bi bi-mortarboard-fill me-2"></span>Quiz App
-        </NavLink>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav me-auto">
-                <li class="nav-item">
-                    <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">
-                        <span class="bi bi-house-fill" aria-hidden="true"></span> Hjem
-                    </NavLink>
-                </li>
-                
-                @if (IsAuthenticated)
-                {
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="quizDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <span class="bi bi-journal-text" aria-hidden="true"></span> Quizzer
-                        </a>
-                        <ul class="dropdown-menu" aria-labelledby="quizDropdown">
-                            <li>
-                                <NavLink class="dropdown-item" href="myquizzes">
-                                    <span class="bi bi-folder-fill" aria-hidden="true"></span> Mine Quizzer
-                                </NavLink>
-                            </li>
-                            <li>
-                                <NavLink class="dropdown-item" href="quiz/create">
-                                    <span class="bi bi-plus-circle-fill" aria-hidden="true"></span> Opret Quiz
-                                </NavLink>
-                            </li>
-                        </ul>
-                    </li>
-                }
-            </ul>
-            
-            <ul class="navbar-nav">
-                @if (IsAuthenticated)
-                {
-                    <li class="nav-item">
-                        <NavLink class="nav-link" href="logout">
-                            <span class="bi bi-box-arrow-right" aria-hidden="true"></span> Log ud
-                        </NavLink>
-                    </li>
-                }
-                else
-                {
-                    <li class="nav-item">
-                        <NavLink class="nav-link" href="login">
-                            <span class="bi bi-box-arrow-in-right" aria-hidden="true"></span> Log ind
-                        </NavLink>
-                    </li>
-                    <li class="nav-item">
-                        <NavLink class="nav-link" href="register">
-                            <span class="bi bi-person-plus-fill" aria-hidden="true"></span> Opret bruger
-                        </NavLink>
-                    </li>
-                }
-            </ul>
-        </div>
-    </div>
-</nav>
--->
 
 <main class="container-fluid">
     @Body
@@ -147,9 +77,19 @@
     {
         get
         {
-            var httpContext = HttpContextAccessor.HttpContext;
-            var userIdString = httpContext?.Session.GetString(SessionKeys.UserId);
-            return !string.IsNullOrEmpty(userIdString);
+            try
+            {
+                var httpContext = HttpContextAccessor.HttpContext;
+                if (httpContext == null) return false;
+                
+                // Read from COOKIE (survives navigation)
+                var userId = httpContext.Request.Cookies[CookieKeys.UserId];
+                return !string.IsNullOrEmpty(userId);
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }
