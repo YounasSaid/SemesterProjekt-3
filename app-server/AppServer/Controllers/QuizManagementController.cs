@@ -44,8 +44,8 @@ public class QuizManagementController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        // Check authentication
-        var userIdString = HttpContext.Session.GetString(SessionKeys.UserId);
+        // Check authentication from COOKIE (shared between HTTP and SignalR)
+        var userIdString = HttpContext.Request.Cookies[CookieKeys.UserId];
         if (string.IsNullOrEmpty(userIdString))
         {
             _logger.LogWarning("Unauthenticated user attempted to create quiz");
@@ -54,7 +54,7 @@ public class QuizManagementController : ControllerBase
 
         if (!Guid.TryParse(userIdString, out var userId))
         {
-            _logger.LogError("Invalid userId in session: {UserId}", userIdString);
+            _logger.LogError("Invalid userId in cookie: {UserId}", userIdString);
             return Unauthorized(new { error = "Not authenticated" });
         }
 

@@ -1,9 +1,10 @@
 @page "/quiz/create"
 @using AppServer.Models
 @using AppServer.Utils
+@using AppServer.Services
 @inject IHttpClientFactory HttpClientFactory
 @inject NavigationManager Nav
-@inject IHttpContextAccessor HttpContextAccessor
+@inject SimpleAuthService AuthService
 @inject IJSRuntime JSRuntime
 @rendermode InteractiveServer
 
@@ -179,13 +180,12 @@
 
     protected override void OnInitialized()
     {
-        // Check authentication
-        var httpContext = HttpContextAccessor.HttpContext;
-        var userIdString = httpContext?.Session.GetString(SessionKeys.UserId);
+        // Check authentication from AuthService (SIMPLE!)
+        var userIdString = AuthService.GetUserId();
         
         if (string.IsNullOrEmpty(userIdString))
         {
-            Nav.NavigateTo("/login", forceLoad: true);
+            Nav.NavigateTo("/login");
             return;
         }
 
@@ -375,7 +375,7 @@
             if (response.IsSuccessStatusCode)
             {
                 // Navigate to myquizzes page on success
-                Nav.NavigateTo("/myquizzes", forceLoad: true);
+                Nav.NavigateTo("/myquizzes");
             }
             else
             {
@@ -410,7 +410,7 @@
                 return;
         }
 
-        Nav.NavigateTo("/myquizzes", forceLoad: true);
+        Nav.NavigateTo("/myquizzes");
     }
 
     // Model classes

@@ -1,7 +1,7 @@
 using AppServer.Components;
 using AppServer.Utils;
 using AppServer.Services;
-using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Components.Server.Circuits;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,16 +10,7 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddControllers();
 
-// Configure HttpClient with cookie handling
-builder.Services.AddHttpClient("default", client =>
-{
-    // This HttpClient will use the same cookies as the browser
-}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
-{
-    UseCookies = true,
-    CookieContainer = new System.Net.CookieContainer()
-});
-
+// Configure HttpClient to share cookies with Blazor Server
 builder.Services.AddHttpClient();
 
 // Registrer services
@@ -28,6 +19,11 @@ builder.Services.AddSingleton<UserGrpcClient>();
 builder.Services.AddSingleton<QuizGrpcClient>();
 builder.Services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
 
+// SIMPLE AUTH - Clean approach (NO Circuit ID tracking needed!)
+builder.Services.AddSingleton<SimpleAuthService>();
+builder.Services.AddScoped<SimpleCircuitHandler>();
+builder.Services.AddScoped<CircuitHandler>(sp => sp.GetRequiredService<SimpleCircuitHandler>());
+
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
 {
@@ -35,9 +31,7 @@ builder.Services.AddSession(options =>
     options.IdleTimeout = TimeSpan.FromHours(8);
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
-    options.Cookie.SameSite = SameSiteMode.Lax;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.None; // Allow HTTP for localhost
-    options.Cookie.Path = "/";
+    options.Cookie.SameSite = SameSiteMode.Lax; // Allow cookie to be sent with API requests
 });
 builder.Services.AddHttpContextAccessor();
 
@@ -49,13 +43,10 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+app.UseHttpsRedirection();
 app.UseStaticFiles();
-
-// CRITICAL: Proper middleware order for session
-app.UseRouting();
-app.UseSession(); // Must be after UseRouting and before endpoints
-
 app.UseAntiforgery();
+app.UseSession(); // IMPORTANT: Session must come BEFORE MapControllers
 
 app.MapControllers();
 app.MapRazorComponents<App>()

@@ -80,13 +80,11 @@
             try
             {
                 var httpContext = HttpContextAccessor.HttpContext;
-                if (httpContext == null)
-                {
-                    return false;
-                }
+                if (httpContext == null) return false;
                 
-                var userIdString = httpContext.Session.GetString(SessionKeys.UserId);
-                return !string.IsNullOrEmpty(userIdString);
+                // Read from COOKIE (survives navigation)
+                var userId = httpContext.Request.Cookies[CookieKeys.UserId];
+                return !string.IsNullOrEmpty(userId);
             }
             catch
             {

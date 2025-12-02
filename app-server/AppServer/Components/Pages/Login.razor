@@ -1,8 +1,9 @@
 @page "/login"
 @using AppServer.Models
+@using AppServer.Services
 @inject AppServer.Services.AuthUiService Auth
+@inject SimpleAuthService AuthService
 @inject NavigationManager Nav
-@inject IJSRuntime JSRuntime
 @rendermode InteractiveServer
 
 <h2>Log ind</h2>
@@ -57,12 +58,20 @@
         
         try
         {
-            var (ok, code) = await Auth.LoginAsync(model);
+            // Login via REST API
+            var (ok, code, userId) = await Auth.LoginAsync(model);
             
             if (ok)
             {
-                await Task.Delay(100);
-                Nav.NavigateTo("/myquizzes", forceLoad: true);
+                Console.WriteLine($"✅ LOGIN: userId={userId}");
+                
+                // Store userId in AuthService (SIMPLE - no Circuit ID needed!)
+                AuthService.SetUserId(userId);
+                Console.WriteLine("✅ LOGIN: UserId stored");
+                
+                // Navigate to myquizzes
+                Console.WriteLine("✅ LOGIN: Navigating to /myquizzes");
+                Nav.NavigateTo("/myquizzes");
             }
             else
             {
@@ -75,6 +84,7 @@
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"❌ LOGIN exception: {ex.Message}");
             error = "Der opstod en fejl. Prøv igen.";
             submitting = false;
             StateHasChanged();

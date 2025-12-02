@@ -4,7 +4,7 @@
 @code {
     protected override void OnInitialized()
     {
-        // Redirect to /myquizzes
-        Nav.NavigateTo("/myquizzes", forceLoad: true);
+        // Redirect to /myquizzes (without forceLoad to preserve Circuit)
+        Nav.NavigateTo("/myquizzes");
     }
 }
