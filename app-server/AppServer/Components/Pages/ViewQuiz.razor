@@ -1,0 +1,227 @@
+@page "/quiz/{QuizId:guid}/view"
+@using AppServer.Models
+@using AppServer.Services
+@inject NavigationManager Nav
+@inject SimpleAuthService AuthService
+@inject QuizGrpcClient QuizClient
+@inject IJSRuntime JSRuntime
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Se Quiz</PageTitle>
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-10 mx-auto">
+            @if (_loading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                        <span class="visually-hidden">Indlæser...</span>
+                    </div>
+                    <p class="mt-3 text-muted">Henter quiz...</p>
+                </div>
+            }
+            else if (_error != null)
+            {
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    <strong>Fejl:</strong> @_error
+                </div>
+                <div class="text-center">
+                    <a href="/myquizzes" class="btn btn-primary">
+                        <i class="bi bi-arrow-left"></i> Tilbage til Mine Quizzer
+                    </a>
+                </div>
+            }
+            else if (_quiz != null)
+            {
+                <!-- Header -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h2>@_quiz.Title</h2>
+                        <p class="text-muted mb-0">
+                            <i class="bi bi-calendar3"></i> Oprettet: @_quiz.CreatedAt.ToString("dd/MM/yyyy HH:mm")
+                        </p>
+                    </div>
+                    <div class="btn-group">
+                        <a href="/quiz/@QuizId/edit" class="btn btn-outline-primary">
+                            <i class="bi bi-pencil"></i> Rediger
+                        </a>
+                        <a href="/myquizzes" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Tilbage
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Quiz Info -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <h6 class="text-muted mb-2">Antal Spørgsmål</h6>
+                                <p class="fs-4 mb-0">
+                                    <i class="bi bi-question-circle text-primary"></i>
+                                    @_quiz.Questions.Count
+                                </p>
+                            </div>
+                            <div class="col-md-4">
+                                <h6 class="text-muted mb-2">Total Points</h6>
+                                <p class="fs-4 mb-0">
+                                    <i class="bi bi-trophy text-success"></i>
+                                    @_quiz.TotalPoints
+                                </p>
+                            </div>
+                            <div class="col-md-4">
+                                <h6 class="text-muted mb-2">Gennemsnit per Spørgsmål</h6>
+                                <p class="fs-4 mb-0">
+                                    <i class="bi bi-bar-chart text-info"></i>
+                                    @(_quiz.Questions.Count > 0 ? (_quiz.TotalPoints / (double)_quiz.Questions.Count).ToString("F1") : "0") point
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Questions -->
+                <h4 class="mb-3">Spørgsmål</h4>
+                @foreach (var question in _quiz.Questions.OrderBy(q => q.QuestionOrder))
+                {
+                    <div class="card mb-3">
+                        <div class="card-header bg-light">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">
+                                    <span class="badge bg-primary me-2">@question.QuestionOrder</span>
+                                    @question.QuestionText
+                                </h5>
+                                <span class="badge bg-success">
+                                    <i class="bi bi-trophy"></i> @question.Points point
+                                </span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <h6 class="text-muted mb-3">Svarmuligheder:</h6>
+                            <div class="list-group">
+                                @foreach (var option in question.Options.OrderBy(o => o.OptionOrder))
+                                {
+                                    <div class="list-group-item @(option.IsCorrect ? "list-group-item-success" : "")">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <span class="badge bg-secondary me-2">@option.OptionOrder</span>
+                                                @option.OptionText
+                                            </div>
+                                            @if (option.IsCorrect)
+                                            {
+                                                <span class="badge bg-success">
+                                                    <i class="bi bi-check-circle-fill"></i> Korrekt
+                                                </span>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public Guid QuizId { get; set; }
+
+    private QuizDetailsDto? _quiz;
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Load userId from COOKIE via JSInterop (Tracking Prevention compatible)
+        try
+        {
+            // Read cookie using document.cookie
+            var cookieString = await JSRuntime.InvokeAsync<string>("eval", "document.cookie");
+            Console.WriteLine($"🍪 ViewQuiz: document.cookie = {cookieString}");
+            
+            // Parse userId from cookie string
+            if (!string.IsNullOrEmpty(cookieString))
+            {
+                var cookies = cookieString.Split(';');
+                foreach (var cookie in cookies)
+                {
+                    var parts = cookie.Trim().Split('=');
+                    if (parts.Length == 2 && parts[0] == "userId")
+                    {
+                        var userIdFromCookie = parts[1];
+                        Console.WriteLine($"✅ ViewQuiz: Loaded userId from cookie: {userIdFromCookie}");
+                        AuthService.SetUserId(userIdFromCookie);
+                        break;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠️ ViewQuiz: Could not load from cookie: {ex.Message}");
+        }
+        
+        await LoadQuiz();
+    }
+
+    private async Task LoadQuiz()
+    {
+        _loading = true;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            // Get userId from SimpleAuthService
+            var userIdString = AuthService.GetUserId();
+            Console.WriteLine($"🔍 ViewQuiz: AuthService.GetUserId() = {userIdString ?? "NULL"}");
+            
+            if (string.IsNullOrEmpty(userIdString))
+            {
+                Console.WriteLine("❌ ViewQuiz: No userId found in AuthService");
+                _error = "Du skal være logget ind for at se quizzer.";
+                Nav.NavigateTo("/login");
+                return;
+            }
+
+            if (!Guid.TryParse(userIdString, out var userId))
+            {
+                Console.WriteLine($"❌ ViewQuiz: Invalid userId format: {userIdString}");
+                _error = "Ugyldig bruger session.";
+                Nav.NavigateTo("/login");
+                return;
+            }
+
+            Console.WriteLine($"✅ ViewQuiz: Calling QuizClient.GetQuizAsync(quizId={QuizId}, userId={userId})");
+            
+            // Call gRPC client directly
+            _quiz = await QuizClient.GetQuizAsync(QuizId, userId);
+
+            if (_quiz == null)
+            {
+                Console.WriteLine($"❌ ViewQuiz: QuizClient.GetQuizAsync returned NULL for quizId={QuizId}");
+                _error = "Quiz blev ikke fundet.";
+            }
+            else
+            {
+                Console.WriteLine($"✅ ViewQuiz: Successfully loaded quiz: {_quiz.Title}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ ViewQuiz: Exception: {ex.Message}");
+            Console.WriteLine($"❌ ViewQuiz: StackTrace: {ex.StackTrace}");
+            _error = "Der opstod en fejl ved indlæsning af quiz.";
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+}

@@ -4,6 +4,7 @@
 @inject AppServer.Services.AuthUiService Auth
 @inject SimpleAuthService AuthService
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 @rendermode InteractiveServer
 
 <h2>Log ind</h2>
@@ -67,7 +68,11 @@
                 
                 // Store userId in AuthService (SIMPLE - no Circuit ID needed!)
                 AuthService.SetUserId(userId);
-                Console.WriteLine("✅ LOGIN: UserId stored");
+                Console.WriteLine("✅ LOGIN: UserId stored in AuthService");
+                
+                // ALSO store in browser LocalStorage for persistence across reloads
+                await JS.InvokeVoidAsync("localStorage.setItem", "userId", userId);
+                Console.WriteLine("✅ LOGIN: UserId stored in LocalStorage");
                 
                 // Navigate to myquizzes
                 Console.WriteLine("✅ LOGIN: Navigating to /myquizzes");

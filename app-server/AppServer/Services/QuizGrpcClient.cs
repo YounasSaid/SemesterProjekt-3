@@ -187,6 +187,79 @@ public class QuizGrpcClient : IDisposable
         }
     }
 
+    /// <summary>
+    /// Gets full details of a specific quiz with all questions and options
+    /// </summary>
+    /// <param name="quizId">ID of the quiz</param>
+    /// <param name="userId">ID of the requesting user</param>
+    /// <returns>QuizDetailsDto if found and user has access, null otherwise</returns>
+    public async Task<QuizDetailsDto?> GetQuizAsync(Guid quizId, Guid userId)
+    {
+        try
+        {
+            var request = new SemesterProjekt.Proto.Quiz.GetQuizRequest
+            {
+                QuizId = quizId.ToString(),
+                UserId = userId.ToString()
+            };
+
+            // Call gRPC service
+            var response = await _quizClient.GetQuizAsync(request);
+
+            if (response == null || !response.Found)
+            {
+                return null;
+            }
+
+            // Map to DTO
+            var quiz = new QuizDetailsDto
+            {
+                QuizId = Guid.Parse(response.QuizId),
+                Title = response.Title,
+                CreatedAt = DateTime.Parse(response.CreatedAt),
+                TotalPoints = response.TotalPoints,
+                Questions = new List<QuestionDto>()
+            };
+
+            foreach (var q in response.Questions)
+            {
+                var question = new QuestionDto
+                {
+                    QuestionId = Guid.Parse(q.QuestionId),
+                    QuestionText = q.QuestionText,
+                    QuestionOrder = q.QuestionOrder,
+                    Points = q.Points,
+                    Options = new List<QuestionOptionDto>()
+                };
+
+                foreach (var o in q.Options)
+                {
+                    question.Options.Add(new QuestionOptionDto
+                    {
+                        OptionId = Guid.Parse(o.OptionId),
+                        OptionText = o.OptionText,
+                        OptionOrder = o.OptionOrder,
+                        IsCorrect = o.IsCorrect
+                    });
+                }
+
+                quiz.Questions.Add(question);
+            }
+
+            return quiz;
+        }
+        catch (Grpc.Core.RpcException ex)
+        {
+            _logger.LogError(ex, "gRPC error when getting quiz {QuizId}", quizId);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error when getting quiz {QuizId}", quizId);
+            return null;
+        }
+    }
+
     public void Dispose()
     {
         _channel?.Dispose();

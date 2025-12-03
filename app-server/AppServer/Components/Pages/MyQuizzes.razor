@@ -6,7 +6,7 @@
 @inject NavigationManager Nav
 @inject SimpleAuthService AuthService
 @inject IJSRuntime JSRuntime
-@rendermode InteractiveServer
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 
 <PageTitle>Mine Quizzer</PageTitle>
 
@@ -32,7 +32,7 @@
                 </div>
             }
             <!-- Error State -->
-            else if (_error != null)
+            @if (_error != null)
             {
                 <div class="alert alert-danger alert-dismissible fade show" role="alert">
                     <i class="bi bi-exclamation-triangle-fill me-2"></i>
@@ -46,7 +46,7 @@
                 </div>
             }
             <!-- Success Message -->
-            else if (_successMessage != null)
+            @if (_successMessage != null)
             {
                 <div class="alert alert-success alert-dismissible fade show" role="alert">
                     <i class="bi bi-check-circle-fill me-2"></i>
@@ -105,9 +105,13 @@
                                     </p>
                                     
                                     <div class="mt-auto d-flex gap-2">
+                                        <button class="btn btn-sm btn-outline-success" 
+                                                @onclick="() => EditQuiz(quiz.QuizId)">
+                                            <i class="bi bi-pencil"></i> Rediger
+                                        </button>
                                         <button class="btn btn-sm btn-outline-primary flex-grow-1" 
                                                 @onclick="() => ViewQuiz(quiz.QuizId)">
-                                            <i class="bi bi-eye"></i> Se Quiz
+                                            <i class="bi bi-play-circle"></i> Test Quiz
                                         </button>
                                         <button class="btn btn-sm btn-outline-danger" 
                                                 @onclick="() => ShowDeleteConfirmation(quiz)">
@@ -205,10 +209,24 @@
     {
         Console.WriteLine("=== MYQUIZZES: OnInitializedAsync START ===");
         
-        // Read userId from AuthService (SIMPLE - no Circuit ID!)
-        var userIdString = AuthService.GetUserId();
+        // TRY LOCALSTORAGE FIRST (persistent across reloads), then fall back to AuthService
+        string? userIdString = null;
         
-        Console.WriteLine($"🔍 MYQUIZZES: UserId={userIdString ?? "NULL"}");
+        try
+        {
+            userIdString = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userId");
+            Console.WriteLine($"🔍 MYQUIZZES: LocalStorage UserId={userIdString ?? "NULL"}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠️ MYQUIZZES: LocalStorage error: {ex.Message}");
+        }
+        
+        if (string.IsNullOrEmpty(userIdString))
+        {
+            userIdString = AuthService.GetUserId();
+            Console.WriteLine($"🔍 MYQUIZZES: AuthService UserId={userIdString ?? "NULL"}");
+        }
         
         if (string.IsNullOrEmpty(userIdString))
         {
@@ -224,6 +242,7 @@
     {
         _loading = true;
         _error = null;
+        _successMessage = null; // Clear old success messages too
         StateHasChanged();
         
         try
@@ -267,7 +286,14 @@
 
     private void ViewQuiz(Guid quizId)
     {
-        Nav.NavigateTo($"/quiz/{quizId}");
+        // TODO: Create quiz view/preview page
+        Nav.NavigateTo($"/quiz/{quizId}/view");
+    }
+    
+    private void EditQuiz(Guid quizId)
+    {
+        // TODO: Create quiz edit page
+        Nav.NavigateTo($"/quiz/{quizId}/edit");
     }
 
     private void ShowDeleteConfirmation(QuizSummaryDto quiz)

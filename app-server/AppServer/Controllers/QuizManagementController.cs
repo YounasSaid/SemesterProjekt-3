@@ -210,6 +210,59 @@ public class QuizManagementController : ControllerBase
     }
 
     /// <summary>
+    /// Gets full details of a specific quiz including all questions and options
+    /// </summary>
+    /// <param name="quizId">ID of the quiz to retrieve</param>
+    /// <returns>Quiz details with questions and options</returns>
+    /// <response code="200">Quiz retrieved successfully</response>
+    /// <response code="401">User not authenticated</response>
+    /// <response code="403">User not authorized to view this quiz</response>
+    /// <response code="404">Quiz not found</response>
+    /// <response code="500">Internal server error</response>
+    [HttpGet("{quizId}")]
+    [ProducesResponseType(typeof(QuizDetailsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetQuiz(Guid quizId)
+    {
+        // Check authentication from COOKIE (shared between HTTP and SignalR)
+        var userIdString = HttpContext.Request.Cookies[CookieKeys.UserId];
+        if (string.IsNullOrEmpty(userIdString))
+        {
+            _logger.LogWarning("Unauthenticated user attempted to retrieve quiz {QuizId}", quizId);
+            return Unauthorized(new { error = "Not authenticated" });
+        }
+
+        if (!Guid.TryParse(userIdString, out var userId))
+        {
+            _logger.LogError("Invalid userId in session: {UserId}", userIdString);
+            return Unauthorized(new { error = "Not authenticated" });
+        }
+
+        try
+        {
+            // Call gRPC client
+            var quiz = await _quizClient.GetQuizAsync(quizId, userId);
+
+            if (quiz == null)
+            {
+                _logger.LogWarning("Quiz not found or access denied: {QuizId} for user {UserId}", quizId, userId);
+                return NotFound(new { error = "Quiz not found" });
+            }
+
+            _logger.LogInformation("Retrieved quiz {QuizId} for user {UserId}", quizId, userId);
+            return Ok(quiz);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving quiz {QuizId} for user {UserId}", quizId, userId);
+            return StatusCode(500, new { error = "An error occurred while retrieving the quiz" });
+        }
+    }
+
+    /// <summary>
     /// Validates quiz request data
     /// </summary>
     /// <param name="request">Quiz request to validate</param>

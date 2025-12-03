@@ -14,11 +14,13 @@ public class AuthController : ControllerBase
     private readonly GrpcChannel _grpcChannel;
     private readonly UserService.UserServiceClient _userClient;
     private readonly ILogger<AuthController> _logger;
+    private readonly Services.SimpleAuthService _authService;
 
-    public AuthController(IPasswordHasher hasher, ILogger<AuthController> logger)
+    public AuthController(IPasswordHasher hasher, ILogger<AuthController> logger, Services.SimpleAuthService authService)
     {
         _hasher = hasher;
         _logger = logger;
+        _authService = authService;
         
         _grpcChannel = GrpcChannel.ForAddress("http://localhost:9090");
         _userClient = new UserService.UserServiceClient(_grpcChannel);
@@ -85,21 +87,27 @@ public class AuthController : ControllerBase
             if (!_hasher.Verify(req.Password, grpcResponse.PasswordHash))
                 return Unauthorized(new { code = "INVALID_CREDENTIALS" });
 
-            // Store in BOTH Session AND Cookie for maximum compatibility
+            // Store in Session, Cookie, AND SimpleAuthService for maximum compatibility
             // Session for REST API calls
             var _ = HttpContext.Session.Id;
             HttpContext.Session.SetString(SessionKeys.UserId, grpcResponse.UserId);
             await HttpContext.Session.CommitAsync();
 
             // Cookie for Blazor components (survives navigation)
+            // NOTE: HttpOnly = false so JavaScript can read it for debugging
+            _logger.LogInformation("🍪 Setting cookie: {CookieName}={CookieValue}", CookieKeys.UserId, grpcResponse.UserId);
             Response.Cookies.Append(CookieKeys.UserId, grpcResponse.UserId, new CookieOptions
             {
-                HttpOnly = true,
+                HttpOnly = false, // CHANGED: Allow JavaScript to read cookie
                 Secure = false, // Allow HTTP for localhost
                 SameSite = SameSiteMode.Lax,
                 Expires = DateTimeOffset.UtcNow.AddHours(8),
                 Path = "/"
             });
+            _logger.LogInformation("🍪 Cookie set successfully!");
+            
+            // SimpleAuthService for Blazor pages
+            _authService.SetUserId(grpcResponse.UserId);
 
             _logger.LogInformation("=== LOGIN SUCCESS ===");
             _logger.LogInformation("UserId: {UserId}", grpcResponse.UserId);
@@ -124,6 +132,7 @@ public class AuthController : ControllerBase
     {
         HttpContext.Session.Clear();
         Response.Cookies.Delete(CookieKeys.UserId);
+        _authService.ClearUserId();
         return Ok(new { success = true });
     }
 }
