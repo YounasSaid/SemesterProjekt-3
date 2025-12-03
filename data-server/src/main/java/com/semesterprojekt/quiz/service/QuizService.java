@@ -1,18 +1,15 @@
 package com.semesterprojekt.quiz.service;
 
-import com.semesterprojekt.quiz.*;
-import com.semesterprojekt.quiz.exception.QuizNotFoundException;
-
-import com.semesterprojekt.proto.quiz.CreateQuizRequest;
-import com.semesterprojekt.proto.quiz.CreateQuizQuestion;
-import com.semesterprojekt.proto.quiz.CreateQuestionOption;
-
+import com.semesterprojekt.quiz.Question;
+import com.semesterprojekt.quiz.QuestionOptionEntity;
+import com.semesterprojekt.quiz.QuizEntity;
+import com.semesterprojekt.quiz.QuizRepository;
 import com.semesterprojekt.proto.quiz.*;
-
-
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -24,142 +21,121 @@ public class QuizService {
     this.quizRepository = quizRepository;
   }
 
-  /**
-   * Creates a quiz from a gRPC CreateQuizRequest
-   */
   @Transactional
   public QuizEntity createQuiz(CreateQuizRequest request) {
-
     QuizEntity quiz = new QuizEntity();
+    quiz.setCreatedBy(UUID.fromString(request.getCreatedBy()));
     quiz.setTitle(request.getTitle());
-    quiz.setCreatedBy(UUID.fromString(request.getCreatedBy())); // <-- FIX
 
-    // For each proto question → JPA Question entity
-    for (CreateQuizQuestion qReq : request.getQuestionsList()) {
+    List<Question> questions = new ArrayList<>();
+
+    for (int i = 0; i < request.getQuestionsCount(); i++) {
+      var reqQ = request.getQuestions(i);
 
       Question q = new Question();
-      q.setQuestionText(qReq.getQuestionText());
-      q.setQuestionOrder(qReq.getQuestionOrder());
-      q.setPoints(qReq.getPoints());
-      q.setQuiz(quiz);  // relationship
+      q.setQuestionText(reqQ.getQuestionText());
+      q.setQuestionOrder(reqQ.getQuestionOrder());
+      q.setPoints(reqQ.getPoints());
+      q.setQuiz(quiz);
 
-      // Add options
-      for (CreateQuestionOption optReq : qReq.getOptionsList()) {
+      List<QuestionOptionEntity> options = new ArrayList<>();
+      for (int j = 0; j < reqQ.getOptionsCount(); j++) {
+        var reqOpt = reqQ.getOptions(j);
 
         QuestionOptionEntity opt = new QuestionOptionEntity();
-        opt.setOptionText(optReq.getOptionText());
-        opt.setCorrect(optReq.getIsCorrect());
-        opt.setOptionOrder(optReq.getOptionOrder());
-        opt.setQuestion(q); // relationship
+        opt.setOptionText(reqOpt.getOptionText());
+        opt.setCorrect(reqOpt.getIsCorrect());
+        opt.setOptionOrder(reqOpt.getOptionOrder());
+        opt.setQuestion(q);
 
-        q.getOptions().add(opt);
+        options.add(opt);
       }
-
-      quiz.getQuestions().add(q);
+      q.setOptions(options);
+      questions.add(q);
     }
 
+    quiz.setQuestions(questions);
     return quizRepository.save(quiz);
   }
 
-  /**
-   * Get quiz by ID
-   */
+  @Transactional
+  public boolean deleteQuiz(UUID quizId, String userIdStr) {
+    UUID userId = UUID.fromString(userIdStr);
+    return quizRepository.findById(quizId)
+            .filter(quiz -> quiz.getCreatedBy().equals(userId))
+            .map(quiz -> {
+              quizRepository.delete(quiz);
+              return true;
+            })
+            .orElse(false);
+  }
+
+  @Transactional(readOnly = true)
+  public List<QuizEntity> getUserQuizzes(String userIdStr) {
+    UUID userId = UUID.fromString(userIdStr);
+    return quizRepository.findByCreatedByWithQuestions(userId);
+  }
+
   @Transactional(readOnly = true)
   public QuizEntity getQuiz(UUID id) {
-    return quizRepository.findById(id)
-        .orElseThrow(() -> new QuizNotFoundException(id.toString()));
+    return quizRepository.findById(id).orElse(null);
   }
 
-  /**
-   * Get quizzes for user
-   */
-  @Transactional(readOnly = true)
-  public java.util.List<QuizEntity> getUserQuizzes(String userId) {
-    return quizRepository.findByCreatedBy(UUID.fromString(userId));
-  }
-
-  /**
-   * Calculate total points
-   */
   public int calculateTotalPoints(QuizEntity quiz) {
     return quiz.getQuestions().stream()
-        .mapToInt(Question::getPoints)
-        .sum();
+            .mapToInt(Question::getPoints)
+            .sum();
   }
 
-  /**
-   * Delete quiz
-   */
-  @Transactional
-  public boolean deleteQuiz(UUID quizId, String userId) {
-    QuizEntity quiz = getQuiz(quizId);
-
-    // Only creator can delete
-    if (!quiz.getCreatedBy().equals(userId)) {
-      return false;
-    }
-
-    quizRepository.delete(quiz);
-    return true;
-  }
-
-  @Transactional
+  @Transactional(readOnly = true)
   public SubmitQuizResponse gradeQuiz(SubmitQuizRequest request) {
-
     UUID quizId = UUID.fromString(request.getQuizId());
-    QuizEntity quiz = getQuiz(quizId);
+    QuizEntity quiz = quizRepository.findById(quizId).orElse(null);
 
-    SubmitQuizResponse.Builder response = SubmitQuizResponse.newBuilder();
-
-    int totalPoints = calculateTotalPoints(quiz);
-    int score = 0;
-
-    // Add result details
-    SubmitQuizResponse.Builder res = SubmitQuizResponse.newBuilder();
-
-    // Build list of result entries
-    for (QuizAnswer answer : request.getAnswersList()) {
-
-      String questionId = answer.getQuestionId();
-      String selectedOptionId = answer.getSelectedOptionId();
-
-      Question question =
-          quiz.getQuestions().stream()
-              .filter(q -> q.getId().toString().equals(questionId))
-              .findFirst()
-              .orElse(null);
-
-      // If question not found, skip (should not happen)
-      if (question == null) continue;
-
-      // Find the chosen option
-      QuestionOptionEntity chosen =
-          question.getOptions().stream()
-              .filter(o -> o.getId().toString().equals(selectedOptionId))
-              .findFirst()
-              .orElse(null);
-
-      boolean isCorrect = chosen != null && chosen.isCorrect();
-      int pointsEarned = isCorrect ? question.getPoints() : 0;
-
-      score += pointsEarned;
-
-      // Build AnswerResult
-      AnswerResult result = AnswerResult.newBuilder()
-          .setQuestionId(questionId)
-          .setIsCorrect(isCorrect)
-          .setPointsEarned(pointsEarned)
-          .build();
-
-      res.addResults(result);
+    if (quiz == null) {
+      return SubmitQuizResponse.newBuilder()
+              .setSuccess(false)
+              .setScore(0)
+              .setTotalPoints(0)
+              .build();
     }
 
-    // Build final response
-    response.setSuccess(true);
-    response.setScore(score);
-    response.setTotalPoints(totalPoints);
-    response.addAllResults(res.getResultsList());
+    int score = 0;
+    int totalPoints = calculateTotalPoints(quiz);
+    SubmitQuizResponse.Builder responseBuilder = SubmitQuizResponse.newBuilder();
 
-    return response.build();
+    for (var answer : request.getAnswersList()) {
+      UUID questionId = UUID.fromString(answer.getQuestionId());
+      UUID selectedOptionId = UUID.fromString(answer.getSelectedOptionId());
+
+      Question question = quiz.getQuestions().stream()
+              .filter(q -> q.getId().equals(questionId))
+              .findFirst()
+              .orElse(null);
+
+      if (question != null) {
+        QuestionOptionEntity selectedOption = question.getOptions().stream()
+                .filter(opt -> opt.getId().equals(selectedOptionId))
+                .findFirst()
+                .orElse(null);
+
+        boolean isCorrect = selectedOption != null && selectedOption.isCorrect();
+        int pointsEarned = isCorrect ? question.getPoints() : 0;
+        score += pointsEarned;
+
+        responseBuilder.addResults(
+                AnswerResult.newBuilder()
+                        .setQuestionId(questionId.toString())
+                        .setIsCorrect(isCorrect)
+                        .setPointsEarned(pointsEarned)
+        );
+      }
+    }
+
+    return responseBuilder
+            .setSuccess(true)
+            .setScore(score)
+            .setTotalPoints(totalPoints)
+            .build();
   }
 }

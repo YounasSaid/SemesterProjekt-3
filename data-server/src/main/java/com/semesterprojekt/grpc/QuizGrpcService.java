@@ -152,7 +152,9 @@ public class QuizGrpcService extends QuizServiceGrpc.QuizServiceImplBase {
           .setFound(true)
           .setQuizId(quiz.getId().toString())
           .setTitle(quiz.getTitle())
-          .setCreatedBy(quiz.getCreatedBy().toString()); // <-- UUID to string
+          .setCreatedBy(quiz.getCreatedBy().toString())
+          .setCreatedAt(quiz.getCreatedAt().toString())  // Added
+          .setTotalPoints(quizService.calculateTotalPoints(quiz));  // Added
 
       for (Question q : quiz.getQuestions()) {
         QuizQuestion.Builder qBuilder = QuizQuestion.newBuilder()
@@ -167,6 +169,7 @@ public class QuizGrpcService extends QuizServiceGrpc.QuizServiceImplBase {
                   .setOptionId(opt.getId().toString())
                   .setOptionText(opt.getOptionText())
                   .setOptionOrder(opt.getOptionOrder())
+                  .setIsCorrect(opt.isCorrect())  // Added
           );
         }
 

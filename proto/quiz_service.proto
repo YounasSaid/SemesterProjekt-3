@@ -73,6 +73,7 @@ message QuizSummary {
 // Get Quiz Messages (for playing quiz)
 message GetQuizRequest {
     string quiz_id = 1;
+    string user_id = 2;  // Added: user_id for authorization check
 }
 
 message GetQuizResponse {
@@ -80,7 +81,9 @@ message GetQuizResponse {
     string quiz_id = 2;
     string title = 3;
     string created_by = 4;
-    repeated QuizQuestion questions = 5;
+    string created_at = 5;  // Added: creation timestamp
+    int32 total_points = 6;  // Added: total points
+    repeated QuizQuestion questions = 7;
 }
 
 message QuizQuestion {
@@ -95,6 +98,7 @@ message QuestionOption {
     string option_id = 1;
     string option_text = 2;
     int32 option_order = 3;
+    bool is_correct = 4;  // Added: is_correct field
 }
 
 // Submit Quiz Messages

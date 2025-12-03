@@ -16,7 +16,7 @@ import java.util.UUID;
  * Stored in table: "questions"
  */
 @Entity
-@Table(name = "questions")
+@Table(name = "quiz_questions")
 public class Question
 {
 
