@@ -1,0 +1,352 @@
+@page "/profile"
+@using AppServer.Services
+@using AppServer.Models
+@inject IHttpClientFactory HttpClientFactory
+@inject NavigationManager Nav
+@inject SimpleAuthService AuthService
+@inject IJSRuntime JSRuntime
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Min Profil</PageTitle>
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-10 mx-auto">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="bi bi-person-circle"></i> Min Profil</h2>
+                <a href="/" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Tilbage
+                </a>
+            </div>
+
+            <!-- Loading State -->
+            @if (_loading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                        <span class="visually-hidden">Indlæser...</span>
+                    </div>
+                    <p class="mt-3 text-muted">Henter profildata...</p>
+                </div>
+            }
+            else if (_loadError != null)
+            {
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    <strong>Fejl:</strong> @_loadError
+                </div>
+            }
+            else if (_profile != null)
+            {
+                <!-- Success/Error Messages -->
+                @if (_successMessage != null)
+                {
+                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        <i class="bi bi-check-circle-fill me-2"></i>
+                        @_successMessage
+                        <button type="button" class="btn-close" @onclick="() => _successMessage = null"></button>
+                    </div>
+                }
+                @if (_errorMessage != null)
+                {
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        @_errorMessage
+                        <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
+                    </div>
+                }
+
+                <!-- Brugeroplysninger Card -->
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="bi bi-info-circle"></i> Brugeroplysninger</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="text-muted small">Fornavn</label>
+                                <p class="fs-5 mb-0">@_profile.FirstName</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="text-muted small">Efternavn</label>
+                                <p class="fs-5 mb-0">@_profile.LastName</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="text-muted small">Email</label>
+                                <p class="fs-5 mb-0">@_profile.Email</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="text-muted small">Semester</label>
+                                <p class="fs-5 mb-0">@_profile.Semester</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Statistics Row -->
+                <div class="row mb-4">
+                    <!-- All Time Score Card -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100 bg-light">
+                            <div class="card-body text-center">
+                                <i class="bi bi-trophy-fill text-warning" style="font-size: 3rem;"></i>
+                                <h5 class="mt-3">All Time Score</h5>
+                                <p class="fs-1 fw-bold text-primary mb-0">---</p>
+                                <p class="text-muted small">Points samlet i alt</p>
+                                <span class="badge bg-secondary">Kommer snart</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Completed Quizzes Card -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100 bg-light">
+                            <div class="card-body text-center">
+                                <i class="bi bi-check-circle-fill text-success" style="font-size: 3rem;"></i>
+                                <h5 class="mt-3">Gennemførte Quizzer</h5>
+                                <p class="fs-1 fw-bold text-success mb-0">---</p>
+                                <p class="text-muted small">Quizzer du har taget</p>
+                                <span class="badge bg-secondary">Kommer snart</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Change Password Card -->
+                <div class="card">
+                    <div class="card-header bg-warning">
+                        <h5 class="mb-0"><i class="bi bi-key-fill"></i> Skift Adgangskode</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (_showPasswordForm)
+                        {
+                            <EditForm Model="_passwordRequest" OnValidSubmit="HandlePasswordUpdate" FormName="PasswordUpdateForm">
+                                <DataAnnotationsValidator />
+                                
+                                <!-- Current Password -->
+                                <div class="mb-3">
+                                    <label class="form-label">Nuværende Adgangskode</label>
+                                    <InputText type="password" 
+                                               class="form-control" 
+                                               @bind-Value="_passwordRequest.CurrentPassword"
+                                               placeholder="Indtast nuværende adgangskode" />
+                                    <ValidationMessage For="@(() => _passwordRequest.CurrentPassword)" />
+                                </div>
+
+                                <!-- New Password -->
+                                <div class="mb-3">
+                                    <label class="form-label">Ny Adgangskode</label>
+                                    <InputText type="password" 
+                                               class="form-control" 
+                                               @bind-Value="_passwordRequest.NewPassword"
+                                               placeholder="Minimum 8 tegn" />
+                                    <ValidationMessage For="@(() => _passwordRequest.NewPassword)" />
+                                </div>
+
+                                <!-- Confirm New Password -->
+                                <div class="mb-3">
+                                    <label class="form-label">Bekræft Ny Adgangskode</label>
+                                    <InputText type="password" 
+                                               class="form-control" 
+                                               @bind-Value="_passwordRequest.ConfirmNewPassword"
+                                               placeholder="Indtast ny adgangskode igen" />
+                                    <ValidationMessage For="@(() => _passwordRequest.ConfirmNewPassword)" />
+                                </div>
+
+                                <!-- Buttons -->
+                                <div class="d-flex gap-2">
+                                    <button type="submit" 
+                                            class="btn btn-warning" 
+                                            disabled="@_updatingPassword">
+                                        @if (_updatingPassword)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-2"></span>
+                                            <span>Opdaterer...</span>
+                                        }
+                                        else
+                                        {
+                                            <i class="bi bi-check-circle"></i>
+                                            <span>Opdater Adgangskode</span>
+                                        }
+                                    </button>
+                                    <button type="button" 
+                                            class="btn btn-secondary" 
+                                            @onclick="CancelPasswordUpdate"
+                                            disabled="@_updatingPassword">
+                                        Annuller
+                                    </button>
+                                </div>
+                            </EditForm>
+                        }
+                        else
+                        {
+                            <p class="text-muted mb-3">Klik på knappen nedenfor for at ændre din adgangskode.</p>
+                            <button class="btn btn-warning" @onclick="ShowPasswordForm">
+                                <i class="bi bi-key-fill"></i> Skift Adgangskode
+                            </button>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private UserProfileDto? _profile;
+    private bool _loading = true;
+    private string? _loadError;
+    private string? _successMessage;
+    private string? _errorMessage;
+    
+    private bool _showPasswordForm = false;
+    private bool _updatingPassword = false;
+    
+    [SupplyParameterFromForm]
+    private UpdatePasswordRequest _passwordRequest { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Load userId from LocalStorage (persistent) or AuthService
+        string? userIdString = null;
+        
+        try
+        {
+            userIdString = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userId");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠️ Profile: LocalStorage error: {ex.Message}");
+        }
+        
+        if (string.IsNullOrEmpty(userIdString))
+        {
+            userIdString = AuthService.GetUserId();
+        }
+        
+        if (string.IsNullOrEmpty(userIdString))
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        await LoadProfile();
+    }
+
+    private async Task LoadProfile()
+    {
+        _loading = true;
+        _loadError = null;
+        StateHasChanged();
+
+        try
+        {
+            var httpClient = HttpClientFactory.CreateClient();
+            httpClient.BaseAddress = new Uri(Nav.BaseUri);
+
+            var response = await httpClient.GetAsync("/api/profile");
+
+            if (response.IsSuccessStatusCode)
+            {
+                _profile = await response.Content.ReadFromJsonAsync<UserProfileDto>();
+                
+                // Set email in password request
+                if (_profile != null)
+                {
+                    _passwordRequest.Email = _profile.Email;
+                }
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                Nav.NavigateTo("/login");
+                return;
+            }
+            else
+            {
+                _loadError = "Kunne ikke indlæse profildata.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _loadError = $"Der opstod en fejl: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ShowPasswordForm()
+    {
+        _showPasswordForm = true;
+        _errorMessage = null;
+        _successMessage = null;
+        
+        // Reset password form
+        _passwordRequest = new UpdatePasswordRequest
+        {
+            Email = _profile?.Email ?? ""
+        };
+    }
+
+    private void CancelPasswordUpdate()
+    {
+        _showPasswordForm = false;
+        _passwordRequest = new UpdatePasswordRequest
+        {
+            Email = _profile?.Email ?? ""
+        };
+    }
+
+    private async Task HandlePasswordUpdate()
+    {
+        _updatingPassword = true;
+        _errorMessage = null;
+        _successMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var httpClient = HttpClientFactory.CreateClient();
+            httpClient.BaseAddress = new Uri(Nav.BaseUri);
+
+            var response = await httpClient.PutAsJsonAsync("/api/profile/password", _passwordRequest);
+
+            if (response.IsSuccessStatusCode)
+            {
+                _successMessage = "Adgangskode blev opdateret succesfuldt!";
+                _showPasswordForm = false;
+                
+                // Reset form
+                _passwordRequest = new UpdatePasswordRequest
+                {
+                    Email = _profile?.Email ?? ""
+                };
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                
+                if (errorContent.Contains("WRONG_PASSWORD"))
+                {
+                    _errorMessage = "Nuværende adgangskode er forkert.";
+                }
+                else
+                {
+                    _errorMessage = "Kunne ikke opdatere adgangskode. Prøv igen.";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Der opstod en fejl: {ex.Message}";
+        }
+        finally
+        {
+            _updatingPassword = false;
+            StateHasChanged();
+        }
+    }
+}
