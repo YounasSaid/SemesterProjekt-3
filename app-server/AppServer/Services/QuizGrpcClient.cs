@@ -260,6 +260,81 @@ public class QuizGrpcClient : IDisposable
         }
     }
 
+    /// <summary>
+    /// Submits quiz answers and returns the graded result
+    /// </summary>
+    /// <param name="quizId">ID of the quiz</param>
+    /// <param name="userId">ID of the user taking the quiz</param>
+    /// <param name="answers">List of answers (questionId -> selectedOptionId)</param>
+    /// <returns>QuizSubmissionResultDto with score and results</returns>
+    public async Task<QuizSubmissionResultDto?> SubmitQuizAsync(
+        Guid quizId, 
+        Guid userId, 
+        List<QuizAnswerDto> answers)
+    {
+        try
+        {
+            var request = new SemesterProjekt.Proto.Quiz.SubmitQuizRequest
+            {
+                QuizId = quizId.ToString(),
+                UserId = userId.ToString()
+            };
+
+            // Add answers to request
+            foreach (var answer in answers)
+            {
+                request.Answers.Add(new SemesterProjekt.Proto.Quiz.QuizAnswer
+                {
+                    QuestionId = answer.QuestionId.ToString(),
+                    SelectedOptionId = answer.SelectedOptionId.ToString()
+                });
+            }
+
+            // Call gRPC service
+            var response = await _quizClient.SubmitQuizAsync(request);
+
+            if (!response.Success)
+            {
+                _logger.LogError("Failed to submit quiz {QuizId}", quizId);
+                return null;
+            }
+
+            // Map response to DTO
+            var result = new QuizSubmissionResultDto
+            {
+                Success = response.Success,
+                Score = response.Score,
+                TotalPoints = response.TotalPoints,
+                Percentage = response.TotalPoints > 0 
+                    ? (double)response.Score / response.TotalPoints * 100 
+                    : 0,
+                Results = new List<AnswerResultDto>()
+            };
+
+            foreach (var r in response.Results)
+            {
+                result.Results.Add(new AnswerResultDto
+                {
+                    QuestionId = Guid.Parse(r.QuestionId),
+                    IsCorrect = r.IsCorrect,
+                    PointsEarned = r.PointsEarned
+                });
+            }
+
+            return result;
+        }
+        catch (Grpc.Core.RpcException ex)
+        {
+            _logger.LogError(ex, "gRPC error when submitting quiz {QuizId}", quizId);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error when submitting quiz {QuizId}", quizId);
+            return null;
+        }
+    }
+
     public void Dispose()
     {
         _channel?.Dispose();

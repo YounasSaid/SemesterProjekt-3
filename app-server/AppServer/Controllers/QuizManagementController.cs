@@ -263,6 +263,77 @@ public class QuizManagementController : ControllerBase
     }
 
     /// <summary>
+    /// Submits quiz answers and returns the graded result
+    /// </summary>
+    /// <param name="quizId">ID of the quiz</param>
+    /// <param name="request">Submission request with answers</param>
+    /// <returns>Quiz submission result with score</returns>
+    /// <response code="200">Quiz submitted successfully</response>
+    /// <response code="400">Invalid submission data</response>
+    /// <response code="401">User not authenticated</response>
+    /// <response code="404">Quiz not found</response>
+    /// <response code="500">Internal server error</response>
+    [HttpPost("{quizId}/submit")]
+    [ProducesResponseType(typeof(QuizSubmissionResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> SubmitQuiz(Guid quizId, [FromBody] SubmitQuizRequest request)
+    {
+        // Validate ModelState
+        if (!ModelState.IsValid)
+        {
+            _logger.LogWarning("Invalid model state for quiz submission");
+            return ValidationProblem(ModelState);
+        }
+
+        // Check authentication from COOKIE
+        var userIdString = HttpContext.Request.Cookies[CookieKeys.UserId];
+        if (string.IsNullOrEmpty(userIdString))
+        {
+            _logger.LogWarning("Unauthenticated user attempted to submit quiz {QuizId}", quizId);
+            return Unauthorized(new { error = "Not authenticated" });
+        }
+
+        if (!Guid.TryParse(userIdString, out var userId))
+        {
+            _logger.LogError("Invalid userId in cookie: {UserId}", userIdString);
+            return Unauthorized(new { error = "Not authenticated" });
+        }
+
+        // Validate answers
+        if (request.Answers == null || request.Answers.Count == 0)
+        {
+            _logger.LogWarning("Quiz submission with no answers for quiz {QuizId}", quizId);
+            return BadRequest(new { error = "At least one answer is required" });
+        }
+
+        try
+        {
+            // Call gRPC client
+            var result = await _quizClient.SubmitQuizAsync(quizId, userId, request.Answers);
+
+            if (result == null)
+            {
+                _logger.LogError("Failed to submit quiz {QuizId} for user {UserId}", quizId, userId);
+                return NotFound(new { error = "Quiz not found or submission failed" });
+            }
+
+            _logger.LogInformation(
+                "Quiz {QuizId} submitted by user {UserId}: Score {Score}/{TotalPoints} ({Percentage:F1}%)",
+                quizId, userId, result.Score, result.TotalPoints, result.Percentage);
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error submitting quiz {QuizId} for user {UserId}", quizId, userId);
+            return StatusCode(500, new { error = "An error occurred while submitting the quiz" });
+        }
+    }
+
+    /// <summary>
     /// Validates quiz request data
     /// </summary>
     /// <param name="request">Quiz request to validate</param>
