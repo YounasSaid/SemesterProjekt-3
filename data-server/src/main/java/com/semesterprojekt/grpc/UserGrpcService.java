@@ -1,35 +1,9 @@
 /**
- * Class: UserGrpcService
+ * Class: UserGrpcService (UPDATED)
  * --------------------------------------------
- * Formål:
- *   Implementerer gRPC-laget for brugerhåndtering.
- *   Denne klasse modtager kald fra App-serveren via gRPC,
- *   kalder UserService for at udføre logikken,
- *   og returnerer svar eller fejl tilbage gennem gRPC-protokollen.
- *
- * Funktion i systemet:
- *   App-serveren (C#) kalder metoder som CreateUser og GetUserByEmail
- *   gennem denne gRPC-service, som igen arbejder med databasen via UserService.
- *
- * Vigtigste metoder:
- *   - createUser(request, responseObserver)
- *       → Modtager en ny brugers data fra App-serveren.
- *         Tjekker dublet via UserService.
- *         Hvis email findes → returnerer fejlkode "ALREADY_EXISTS".
- *         Hvis ikke → gemmer brugeren og returnerer user_id.
- *
- *   - getUserByEmail(request, responseObserver)
- *       → Finder bruger via UserService.getByEmail().
- *         Hvis bruger ikke findes → returnerer fejlkode "NOT_FOUND".
- *         Ellers sendes brugerdata (id, email, passwordHash, semester) tilbage.
- *
- * Bruges af:
- *   - App-serveren (via gRPC client stub)
- *
- * Bemærk:
- *   - Bruger klasser auto-genereret fra proto-filen (fx UserServiceGrpc, CreateUserRequest, osv.).
- *   - gRPC-statusser som ALREADY_EXISTS og NOT_FOUND svarer til exceptions i UserService.
- *   - Denne klasse har ingen databaseadgang selv — alt går gennem UserService.
+ * Tilføjet:
+ *   - getUserById: Hent bruger via user_id (til profilside)
+ *   - updatePassword: Opdater brugerens adgangskode
  */
 
 package com.semesterprojekt.grpc;
@@ -39,13 +13,15 @@ import com.semesterprojekt.user.exception.DuplicateEmailException;
 import com.semesterprojekt.user.exception.UserNotFoundException;
 import com.semesterprojekt.user.service.UserService;
 
-// ↓↓↓ Ret disse imports hvis jeres java_package i .proto er anderledes ↓↓↓
 import com.semesterprojekt.proto.user.CreateUserRequest;
 import com.semesterprojekt.proto.user.CreateUserResponse;
 import com.semesterprojekt.proto.user.GetUserByEmailRequest;
 import com.semesterprojekt.proto.user.GetUserByEmailResponse;
+import com.semesterprojekt.proto.user.GetUserByIdRequest;
+import com.semesterprojekt.proto.user.GetUserByIdResponse;
+import com.semesterprojekt.proto.user.UpdatePasswordRequest;
+import com.semesterprojekt.proto.user.UpdatePasswordResponse;
 import com.semesterprojekt.proto.user.UserServiceGrpc;
-// ↑↑↑ Ret disse imports hvis jeres java_package i .proto er anderledes ↑↑↑
 
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
@@ -65,34 +41,28 @@ public class UserGrpcService extends UserServiceGrpc.UserServiceImplBase {
   @Override
   public void createUser(CreateUserRequest request, StreamObserver<CreateUserResponse> responseObserver) {
     try {
-      // 1) Udtræk felter fra request
       final String email = request.getEmail();
       final String firstName = request.getFirstName();
       final String lastName = request.getLastName();
       final String passwordHash = request.getPasswordHash();
-      final short semester = (short) request.getSemester(); // proto int32 → Java short
+      final short semester = (short) request.getSemester();
 
-      // 2) Kald domænelaget
       User saved = userService.createUser(email, firstName, lastName, passwordHash, semester);
 
-      // 3) Byg gRPC-svar
       CreateUserResponse response = CreateUserResponse.newBuilder()
               .setUserId(saved.getId() != null ? saved.getId().toString() : "")
               .build();
 
-      // 4) Send svar
       responseObserver.onNext(response);
       responseObserver.onCompleted();
 
     } catch (DuplicateEmailException dup) {
-      // E-mail findes allerede → ALREADY_EXISTS
       responseObserver.onError(
               Status.ALREADY_EXISTS
                       .withDescription(dup.getMessage())
                       .asRuntimeException()
       );
     } catch (Exception ex) {
-      // Uventet fejl → INTERNAL
       responseObserver.onError(
               Status.INTERNAL
                       .withDescription("Unexpected error in createUser: " + ex.getMessage())
@@ -108,7 +78,6 @@ public class UserGrpcService extends UserServiceGrpc.UserServiceImplBase {
 
       User u = userService.getByEmail(email);
 
-      // Map til gRPC-respons
       GetUserByEmailResponse response = GetUserByEmailResponse.newBuilder()
               .setFound(true)
               .setUserId(u.getId() != null ? u.getId().toString() : "")
@@ -130,6 +99,78 @@ public class UserGrpcService extends UserServiceGrpc.UserServiceImplBase {
       responseObserver.onError(
               Status.INTERNAL
                       .withDescription("Unexpected error in getUserByEmail: " + ex.getMessage())
+                      .asRuntimeException()
+      );
+    }
+  }
+
+  // ========================
+  // NY - Get User By ID
+  // ========================
+  @Override
+  public void getUserById(GetUserByIdRequest request, StreamObserver<GetUserByIdResponse> responseObserver) {
+    try {
+      final UUID userId = UUID.fromString(request.getUserId());
+
+      User u = userService.getById(userId);
+
+      GetUserByIdResponse response = GetUserByIdResponse.newBuilder()
+              .setFound(true)
+              .setUserId(u.getId() != null ? u.getId().toString() : "")
+              .setEmail(u.getEmail() != null ? u.getEmail() : "")
+              .setFirstName(u.getFirstName() != null ? u.getFirstName() : "")
+              .setLastName(u.getLastName() != null ? u.getLastName() : "")
+              .setSemester(u.getSemester())
+              .build();
+
+      responseObserver.onNext(response);
+      responseObserver.onCompleted();
+
+    } catch (UserNotFoundException nf) {
+      responseObserver.onError(
+              Status.NOT_FOUND
+                      .withDescription(nf.getMessage())
+                      .asRuntimeException()
+      );
+    } catch (Exception ex) {
+      responseObserver.onError(
+              Status.INTERNAL
+                      .withDescription("Unexpected error in getUserById: " + ex.getMessage())
+                      .asRuntimeException()
+      );
+    }
+  }
+
+  // ========================
+  // NY - Update Password
+  // ========================
+  @Override
+  public void updatePassword(UpdatePasswordRequest request, StreamObserver<UpdatePasswordResponse> responseObserver) {
+    try {
+      final UUID userId = UUID.fromString(request.getUserId());
+      final String newPasswordHash = request.getNewPasswordHash();
+
+      userService.updatePassword(userId, newPasswordHash);
+
+      UpdatePasswordResponse response = UpdatePasswordResponse.newBuilder()
+              .setSuccess(true)
+              .setErrorCode("")
+              .build();
+
+      responseObserver.onNext(response);
+      responseObserver.onCompleted();
+
+    } catch (UserNotFoundException nf) {
+      UpdatePasswordResponse response = UpdatePasswordResponse.newBuilder()
+              .setSuccess(false)
+              .setErrorCode("USER_NOT_FOUND")
+              .build();
+      responseObserver.onNext(response);
+      responseObserver.onCompleted();
+    } catch (Exception ex) {
+      responseObserver.onError(
+              Status.INTERNAL
+                      .withDescription("Unexpected error in updatePassword: " + ex.getMessage())
                       .asRuntimeException()
       );
     }

@@ -8,6 +8,8 @@ option csharp_namespace = "SemesterProjekt.Proto.User";
 service UserService {
   rpc CreateUser (CreateUserRequest) returns (CreateUserResponse);
   rpc GetUserByEmail (GetUserByEmailRequest) returns (GetUserByEmailResponse);
+  rpc GetUserById (GetUserByIdRequest) returns (GetUserByIdResponse);
+  rpc UpdatePassword (UpdatePasswordRequest) returns (UpdatePasswordResponse);
 }
 
 message CreateUserRequest {
@@ -34,3 +36,27 @@ message GetUserByEmailResponse {
   int32 semester = 5;
 }
 
+// NY - Get user by ID
+message GetUserByIdRequest {
+  string user_id = 1;
+}
+
+message GetUserByIdResponse {
+  bool found = 1;
+  string user_id = 2;
+  string email = 3;
+  string first_name = 4;
+  string last_name = 5;
+  int32 semester = 6;
+}
+
+// NY - Update password
+message UpdatePasswordRequest {
+  string user_id = 1;
+  string new_password_hash = 2;
+}
+
+message UpdatePasswordResponse {
+  bool success = 1;
+  string error_code = 2;
+}

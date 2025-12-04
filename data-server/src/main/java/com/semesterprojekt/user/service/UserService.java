@@ -6,30 +6,15 @@ import com.semesterprojekt.user.exception.DuplicateEmailException;
 import com.semesterprojekt.user.exception.UserNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.UUID;
+
 /**
- * Class: UserService
+ * Class: UserService (UPDATED)
  * --------------------------------------------
- * Formål:
- *   Indeholder forretningslogikken for User-objekter.
- *   Her tjekkes dubletter, og her gemmes og hentes brugere via UserRepository.
- *
- * Vigtigste metoder:
- *   - createUser(email, firstName, lastName, passwordHash, semester)
- *       → Tjekker først om email allerede findes (case-insensitive).
- *         Hvis den findes → kaster DuplicateEmailException.
- *         Ellers gemmes en ny bruger i databasen.
- *
- *   - getByEmail(email)
- *       → Finder en bruger baseret på email.
- *         Hvis ingen findes → kaster UserNotFoundException.
- *
- * Bruges af:
- *   - gRPC-laget (UserGrpcService), som kalder disse metoder
- *     når klienten opretter eller henter brugere.
- *
- * Bemærk:
- *   @Transactional sikrer, at ændringer i databasen sker som én samlet handling:
- *   enten lykkes alt, eller alt fortrydes.
+ * Tilføjet:
+ *   - getById: Hent bruger via UUID
+ *   - updatePassword: Opdater password hash
  */
 
 @Service
@@ -59,5 +44,40 @@ public class UserService {
   public User getByEmail(String email) {
     return repo.findByEmailIgnoreCase(email)
             .orElseThrow(() -> new UserNotFoundException(email));
+  }
+
+  // ========================
+  // NY - Get by ID
+  // ========================
+  /**
+   * Henter bruger baseret på UUID.
+   * Bruges af profilside til at vise brugerdata.
+   */
+  @Transactional(readOnly = true)
+  public User getById(UUID userId) {
+    return repo.findById(userId)
+            .orElseThrow(() -> new UserNotFoundException(userId.toString()));
+  }
+
+  // ========================
+  // NY - Update Password
+  // ========================
+  /**
+   * Opdaterer brugerens password hash.
+   * 
+   * VIGTIGT: Denne metode forventer at AppServer ALLEREDE har verificeret
+   * brugerens nuværende password via BCrypt.Verify().
+   * 
+   * @param userId ID på brugeren
+   * @param newPasswordHash Ny password hash (allerede hashet + verificeret af AppServer)
+   * @throws UserNotFoundException hvis brugeren ikke findes
+   */
+  @Transactional
+  public void updatePassword(UUID userId, String newPasswordHash) {
+    User user = repo.findById(userId)
+            .orElseThrow(() -> new UserNotFoundException(userId.toString()));
+
+    user.setPasswordHash(newPasswordHash);
+    repo.save(user);
   }
 }
