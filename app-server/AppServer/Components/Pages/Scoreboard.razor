@@ -1,0 +1,143 @@
+@page "/scoreboard"
+@using AppServer.Models
+@using AppServer.Services
+@inject NavigationManager Nav
+@inject QuizGrpcClient QuizClient
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Scoreboard</PageTitle>
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-10 mx-auto">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">
+                        <i class="bi bi-trophy-fill me-2"></i>
+                        Scoreboard
+                    </h3>
+                    <p class="mb-0 mt-2">Top brugere baseret på total score</p>
+                </div>
+                <div class="card-body">
+                    @if (_loading)
+                    {
+                        <div class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                                <span class="visually-hidden">Indlæser...</span>
+                            </div>
+                            <p class="mt-3 text-muted">Henter scoreboard...</p>
+                        </div>
+                    }
+                    else if (_error != null)
+                    {
+                        <div class="alert alert-danger">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            <strong>Fejl:</strong> @_error
+                        </div>
+                    }
+                    else if (_scoreboardEntries.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="text-center" style="width: 80px;">Rang</th>
+                                        <th>Navn</th>
+                                        <th class="text-center">Total Score</th>
+                                        <th class="text-center">Quizzer Gennemført</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @for (int i = 0; i < _scoreboardEntries.Count; i++)
+                                    {
+                                        var entry = _scoreboardEntries[i];
+                                        var rank = i + 1;
+                                        var rowClass = rank == 1 ? "table-warning" : rank == 2 ? "table-light" : rank == 3 ? "table-secondary" : "";
+
+                                        <tr class="@rowClass">
+                                            <td class="text-center fw-bold">
+                                                @if (rank == 1)
+                                                {
+                                                    <span class="badge bg-warning text-dark" style="font-size: 1.2rem;">
+                                                        <i class="bi bi-trophy-fill"></i> #1
+                                                    </span>
+                                                }
+                                                else if (rank == 2)
+                                                {
+                                                    <span class="badge bg-secondary" style="font-size: 1.1rem;">
+                                                        <i class="bi bi-award-fill"></i> #2
+                                                    </span>
+                                                }
+                                                else if (rank == 3)
+                                                {
+                                                    <span class="badge bg-info" style="font-size: 1.1rem;">
+                                                        <i class="bi bi-award-fill"></i> #3
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">#@rank</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                <strong>@entry.FirstName @entry.LastName</strong>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge bg-primary fs-6">@entry.TotalScore point</span>
+                                            </td>
+                                            <td class="text-center">
+                                                @entry.QuizzesTaken quizzer
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-5">
+                            <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+                            <p class="text-muted mt-3">Ingen data tilgængelig endnu</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<ScoreboardEntryDto> _scoreboardEntries = new();
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadScoreboard();
+    }
+
+    private async Task LoadScoreboard()
+    {
+        _loading = true;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            _scoreboardEntries = await QuizClient.GetScoreboardAsync();
+
+            // Sort by total score descending
+            _scoreboardEntries = _scoreboardEntries.OrderByDescending(e => e.TotalScore).ToList();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Der opstod en fejl: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+}
