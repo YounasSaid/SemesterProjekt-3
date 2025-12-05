@@ -1,9 +1,9 @@
 @page "/profile"
-@using AppServer.Services
 @using AppServer.Models
-@inject IHttpClientFactory HttpClientFactory
+@using AppServer.Services
 @inject NavigationManager Nav
 @inject SimpleAuthService AuthService
+@inject QuizGrpcClient QuizClient
 @inject IJSRuntime JSRuntime
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 
@@ -12,179 +12,181 @@
 <div class="container mt-4">
     <div class="row">
         <div class="col-lg-10 mx-auto">
-            <!-- Header -->
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2><i class="bi bi-person-circle"></i> Min Profil</h2>
-                <a href="/" class="btn btn-outline-secondary">
-                    <i class="bi bi-arrow-left"></i> Tilbage
-                </a>
-            </div>
-
-            <!-- Loading State -->
             @if (_loading)
             {
                 <div class="text-center py-5">
                     <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
                         <span class="visually-hidden">Indlæser...</span>
                     </div>
-                    <p class="mt-3 text-muted">Henter profildata...</p>
+                    <p class="mt-3 text-muted">Henter profil...</p>
                 </div>
             }
-            else if (_loadError != null)
+            else if (_error != null)
             {
                 <div class="alert alert-danger">
                     <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                    <strong>Fejl:</strong> @_loadError
+                    <strong>Fejl:</strong> @_error
                 </div>
             }
-            else if (_profile != null)
+            else if (_stats != null)
             {
-                <!-- Success/Error Messages -->
-                @if (_successMessage != null)
-                {
-                    <div class="alert alert-success alert-dismissible fade show" role="alert">
-                        <i class="bi bi-check-circle-fill me-2"></i>
-                        @_successMessage
-                        <button type="button" class="btn-close" @onclick="() => _successMessage = null"></button>
-                    </div>
-                }
-                @if (_errorMessage != null)
-                {
-                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                        @_errorMessage
-                        <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
-                    </div>
-                }
-
-                <!-- Brugeroplysninger Card -->
-                <div class="card mb-4">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0"><i class="bi bi-info-circle"></i> Brugeroplysninger</h5>
-                    </div>
+                <!-- Header -->
+                <div class="card shadow mb-4">
                     <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="text-muted small">Fornavn</label>
-                                <p class="fs-5 mb-0">@_profile.FirstName</p>
+                        <div class="row align-items-center">
+                            <div class="col-auto">
+                                <div class="rounded-circle bg-primary d-flex align-items-center justify-content-center" 
+                                     style="width: 80px; height: 80px;">
+                                    <i class="bi bi-person-fill text-white" style="font-size: 2.5rem;"></i>
+                                </div>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="text-muted small">Efternavn</label>
-                                <p class="fs-5 mb-0">@_profile.LastName</p>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="text-muted small">Email</label>
-                                <p class="fs-5 mb-0">@_profile.Email</p>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="text-muted small">Semester</label>
-                                <p class="fs-5 mb-0">@_profile.Semester</p>
+                            <div class="col">
+                                <h2 class="mb-1">Min Profil</h2>
+                                <p class="text-muted mb-0">
+                                    <i class="bi bi-trophy-fill text-warning"></i>
+                                    Total Score: <strong class="text-primary fs-4">@_stats.TotalScore</strong> point
+                                </p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Statistics Row -->
-                <div class="row mb-4">
-                    <!-- All Time Score Card -->
-                    <div class="col-md-6 mb-3">
-                        <div class="card h-100 bg-light">
+                <!-- Stats Cards -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <div class="card h-100 border-primary">
                             <div class="card-body text-center">
-                                <i class="bi bi-trophy-fill text-warning" style="font-size: 3rem;"></i>
-                                <h5 class="mt-3">All Time Score</h5>
-                                <p class="fs-1 fw-bold text-primary mb-0">---</p>
-                                <p class="text-muted small">Points samlet i alt</p>
-                                <span class="badge bg-secondary">Kommer snart</span>
+                                <i class="bi bi-trophy text-primary" style="font-size: 2rem;"></i>
+                                <h3 class="mt-2 mb-0">@_stats.TotalScore</h3>
+                                <small class="text-muted">Total Score</small>
                             </div>
                         </div>
                     </div>
-
-                    <!-- Completed Quizzes Card -->
-                    <div class="col-md-6 mb-3">
-                        <div class="card h-100 bg-light">
+                    <div class="col-md-3">
+                        <div class="card h-100 border-success">
                             <div class="card-body text-center">
-                                <i class="bi bi-check-circle-fill text-success" style="font-size: 3rem;"></i>
-                                <h5 class="mt-3">Gennemførte Quizzer</h5>
-                                <p class="fs-1 fw-bold text-success mb-0">---</p>
-                                <p class="text-muted small">Quizzer du har taget</p>
-                                <span class="badge bg-secondary">Kommer snart</span>
+                                <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
+                                <h3 class="mt-2 mb-0">@_stats.QuizzesTaken</h3>
+                                <small class="text-muted">Quizzer Gennemført</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card h-100 border-info">
+                            <div class="card-body text-center">
+                                <i class="bi bi-arrow-repeat text-info" style="font-size: 2rem;"></i>
+                                <h3 class="mt-2 mb-0">@_stats.TotalAttempts</h3>
+                                <small class="text-muted">Forsøg i Alt</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card h-100 border-warning">
+                            <div class="card-body text-center">
+                                <i class="bi bi-pencil-square text-warning" style="font-size: 2rem;"></i>
+                                <h3 class="mt-2 mb-0">@_stats.QuizzesCreated</h3>
+                                <small class="text-muted">Quizzer Oprettet</small>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Change Password Card -->
+                <!-- Average Performance -->
+                @if (_stats.QuizzesTaken > 0)
+                {
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="bi bi-graph-up text-primary me-2"></i>
+                                Gennemsnitlig Præstation
+                            </h5>
+                            <div class="progress" style="height: 30px;">
+                                @{
+                                    var avgClass = _stats.AveragePercentage >= 80 ? "bg-success" : 
+                                                  (_stats.AveragePercentage >= 50 ? "bg-warning" : "bg-danger");
+                                }
+                                <div class="progress-bar @avgClass" 
+                                     role="progressbar" 
+                                     style="width: @_stats.AveragePercentage%;">
+                                    @_stats.AveragePercentage.ToString("F1")%
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <!-- Recent Attempts -->
                 <div class="card">
-                    <div class="card-header bg-warning">
-                        <h5 class="mb-0"><i class="bi bi-key-fill"></i> Skift Adgangskode</h5>
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0">
+                            <i class="bi bi-clock-history text-primary me-2"></i>
+                            Seneste Forsøg
+                        </h5>
                     </div>
                     <div class="card-body">
-                        @if (_showPasswordForm)
+                        @if (_stats.RecentAttempts.Any())
                         {
-                            <EditForm Model="_passwordRequest" OnValidSubmit="HandlePasswordUpdate" FormName="PasswordUpdateForm">
-                                <DataAnnotationsValidator />
-                                
-                                <!-- Current Password -->
-                                <div class="mb-3">
-                                    <label class="form-label">Nuværende Adgangskode</label>
-                                    <InputText type="password" 
-                                               class="form-control" 
-                                               @bind-Value="_passwordRequest.CurrentPassword"
-                                               placeholder="Indtast nuværende adgangskode" />
-                                    <ValidationMessage For="@(() => _passwordRequest.CurrentPassword)" />
-                                </div>
-
-                                <!-- New Password -->
-                                <div class="mb-3">
-                                    <label class="form-label">Ny Adgangskode</label>
-                                    <InputText type="password" 
-                                               class="form-control" 
-                                               @bind-Value="_passwordRequest.NewPassword"
-                                               placeholder="Minimum 8 tegn" />
-                                    <ValidationMessage For="@(() => _passwordRequest.NewPassword)" />
-                                </div>
-
-                                <!-- Confirm New Password -->
-                                <div class="mb-3">
-                                    <label class="form-label">Bekræft Ny Adgangskode</label>
-                                    <InputText type="password" 
-                                               class="form-control" 
-                                               @bind-Value="_passwordRequest.ConfirmNewPassword"
-                                               placeholder="Indtast ny adgangskode igen" />
-                                    <ValidationMessage For="@(() => _passwordRequest.ConfirmNewPassword)" />
-                                </div>
-
-                                <!-- Buttons -->
-                                <div class="d-flex gap-2">
-                                    <button type="submit" 
-                                            class="btn btn-warning" 
-                                            disabled="@_updatingPassword">
-                                        @if (_updatingPassword)
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Quiz</th>
+                                            <th class="text-center">Score</th>
+                                            <th class="text-center">Resultat</th>
+                                            <th class="text-center">Tid</th>
+                                            <th class="text-center">Dato</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var attempt in _stats.RecentAttempts)
                                         {
-                                            <span class="spinner-border spinner-border-sm me-2"></span>
-                                            <span>Opdaterer...</span>
+                                            var resultClass = attempt.Percentage >= 80 ? "text-success" : 
+                                                             (attempt.Percentage >= 50 ? "text-warning" : "text-danger");
+                                            
+                                            <tr>
+                                                <td>
+                                                    @attempt.QuizTitle
+                                                    @if (attempt.IsBestAttempt)
+                                                    {
+                                                        <span class="badge bg-success ms-2">
+                                                            <i class="bi bi-star-fill"></i> Bedste
+                                                        </span>
+                                                    }
+                                                </td>
+                                                <td class="text-center">
+                                                    <strong>@attempt.Score</strong> / @attempt.TotalPoints
+                                                </td>
+                                                <td class="text-center @resultClass">
+                                                    <strong>@attempt.Percentage.ToString("F0")%</strong>
+                                                </td>
+                                                <td class="text-center">
+                                                    <small>@attempt.FormattedDuration</small>
+                                                </td>
+                                                <td class="text-center">
+                                                    <small>@attempt.CompletedAt.ToString("dd/MM HH:mm")</small>
+                                                </td>
+                                                <td class="text-end">
+                                                    <a href="/quiz/@attempt.QuizId/take" class="btn btn-sm btn-outline-primary">
+                                                        <i class="bi bi-arrow-repeat"></i>
+                                                    </a>
+                                                </td>
+                                            </tr>
                                         }
-                                        else
-                                        {
-                                            <i class="bi bi-check-circle"></i>
-                                            <span>Opdater Adgangskode</span>
-                                        }
-                                    </button>
-                                    <button type="button" 
-                                            class="btn btn-secondary" 
-                                            @onclick="CancelPasswordUpdate"
-                                            disabled="@_updatingPassword">
-                                        Annuller
-                                    </button>
-                                </div>
-                            </EditForm>
+                                    </tbody>
+                                </table>
+                            </div>
                         }
                         else
                         {
-                            <p class="text-muted mb-3">Klik på knappen nedenfor for at ændre din adgangskode.</p>
-                            <button class="btn btn-warning" @onclick="ShowPasswordForm">
-                                <i class="bi bi-key-fill"></i> Skift Adgangskode
-                            </button>
+                            <div class="text-center py-4">
+                                <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+                                <p class="text-muted mt-2">Du har ikke gennemført nogen quizzer endnu</p>
+                                <a href="/myquizzes" class="btn btn-primary">
+                                    <i class="bi bi-play-circle me-2"></i>
+                                    Tag en quiz
+                                </a>
+                            </div>
                         }
                     </div>
                 </div>
@@ -194,158 +196,65 @@
 </div>
 
 @code {
-    private UserProfileDto? _profile;
+    private UserStatsDto? _stats;
     private bool _loading = true;
-    private string? _loadError;
-    private string? _successMessage;
-    private string? _errorMessage;
-    
-    private bool _showPasswordForm = false;
-    private bool _updatingPassword = false;
-    
-    [SupplyParameterFromForm]
-    private UpdatePasswordRequest _passwordRequest { get; set; } = new();
+    private string? _error;
 
     protected override async Task OnInitializedAsync()
     {
-        // Load userId from LocalStorage (persistent) or AuthService
-        string? userIdString = null;
-        
-        try
-        {
-            userIdString = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userId");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"⚠️ Profile: LocalStorage error: {ex.Message}");
-        }
-        
-        if (string.IsNullOrEmpty(userIdString))
-        {
-            userIdString = AuthService.GetUserId();
-        }
-        
-        if (string.IsNullOrEmpty(userIdString))
-        {
-            Nav.NavigateTo("/login");
-            return;
-        }
-
-        await LoadProfile();
+        await LoadStats();
     }
 
-    private async Task LoadProfile()
+    private async Task LoadStats()
     {
         _loading = true;
-        _loadError = null;
+        _error = null;
         StateHasChanged();
 
         try
         {
-            var httpClient = HttpClientFactory.CreateClient();
-            httpClient.BaseAddress = new Uri(Nav.BaseUri);
-
-            var response = await httpClient.GetAsync("/api/profile");
-
-            if (response.IsSuccessStatusCode)
+            // Get userId from LocalStorage first, then AuthService
+            string? userIdString = null;
+            
+            try
             {
-                _profile = await response.Content.ReadFromJsonAsync<UserProfileDto>();
-                
-                // Set email in password request
-                if (_profile != null)
-                {
-                    _passwordRequest.Email = _profile.Email;
-                }
+                userIdString = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userId");
             }
-            else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            catch { }
+            
+            if (string.IsNullOrEmpty(userIdString))
+            {
+                userIdString = AuthService.GetUserId();
+            }
+            
+            if (string.IsNullOrEmpty(userIdString))
             {
                 Nav.NavigateTo("/login");
                 return;
             }
-            else
+
+            if (!Guid.TryParse(userIdString, out var userId))
             {
-                _loadError = "Kunne ikke indlæse profildata.";
+                Nav.NavigateTo("/login");
+                return;
+            }
+
+            AuthService.SetUserId(userIdString);
+
+            _stats = await QuizClient.GetUserStatsAsync(userId);
+
+            if (_stats == null)
+            {
+                _error = "Kunne ikke hente profil data.";
             }
         }
         catch (Exception ex)
         {
-            _loadError = $"Der opstod en fejl: {ex.Message}";
+            _error = $"Der opstod en fejl: {ex.Message}";
         }
         finally
         {
             _loading = false;
-            StateHasChanged();
-        }
-    }
-
-    private void ShowPasswordForm()
-    {
-        _showPasswordForm = true;
-        _errorMessage = null;
-        _successMessage = null;
-        
-        // Reset password form
-        _passwordRequest = new UpdatePasswordRequest
-        {
-            Email = _profile?.Email ?? ""
-        };
-    }
-
-    private void CancelPasswordUpdate()
-    {
-        _showPasswordForm = false;
-        _passwordRequest = new UpdatePasswordRequest
-        {
-            Email = _profile?.Email ?? ""
-        };
-    }
-
-    private async Task HandlePasswordUpdate()
-    {
-        _updatingPassword = true;
-        _errorMessage = null;
-        _successMessage = null;
-        StateHasChanged();
-
-        try
-        {
-            var httpClient = HttpClientFactory.CreateClient();
-            httpClient.BaseAddress = new Uri(Nav.BaseUri);
-
-            var response = await httpClient.PutAsJsonAsync("/api/profile/password", _passwordRequest);
-
-            if (response.IsSuccessStatusCode)
-            {
-                _successMessage = "Adgangskode blev opdateret succesfuldt!";
-                _showPasswordForm = false;
-                
-                // Reset form
-                _passwordRequest = new UpdatePasswordRequest
-                {
-                    Email = _profile?.Email ?? ""
-                };
-            }
-            else
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                
-                if (errorContent.Contains("WRONG_PASSWORD"))
-                {
-                    _errorMessage = "Nuværende adgangskode er forkert.";
-                }
-                else
-                {
-                    _errorMessage = "Kunne ikke opdatere adgangskode. Prøv igen.";
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _errorMessage = $"Der opstod en fejl: {ex.Message}";
-        }
-        finally
-        {
-            _updatingPassword = false;
             StateHasChanged();
         }
     }

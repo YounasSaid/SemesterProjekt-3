@@ -11,6 +11,11 @@ service QuizService {
     rpc GetUserQuizzes (GetUserQuizzesRequest) returns (GetUserQuizzesResponse);
     rpc GetQuiz (GetQuizRequest) returns (GetQuizResponse);
     rpc SubmitQuiz (SubmitQuizRequest) returns (SubmitQuizResponse);
+    
+    // Attempt-related RPCs
+    rpc GetUserAttempts (GetUserAttemptsRequest) returns (GetUserAttemptsResponse);
+    rpc GetQuizAttempts (GetQuizAttemptsRequest) returns (GetQuizAttemptsResponse);
+    rpc GetUserStats (GetUserStatsRequest) returns (GetUserStatsResponse);
 }
 
 // Create Quiz Messages
@@ -73,7 +78,7 @@ message QuizSummary {
 // Get Quiz Messages (for playing quiz)
 message GetQuizRequest {
     string quiz_id = 1;
-    string user_id = 2;  // Added: user_id for authorization check
+    string user_id = 2;
 }
 
 message GetQuizResponse {
@@ -81,8 +86,8 @@ message GetQuizResponse {
     string quiz_id = 2;
     string title = 3;
     string created_by = 4;
-    string created_at = 5;  // Added: creation timestamp
-    int32 total_points = 6;  // Added: total points
+    string created_at = 5;
+    int32 total_points = 6;
     repeated QuizQuestion questions = 7;
 }
 
@@ -98,7 +103,7 @@ message QuestionOption {
     string option_id = 1;
     string option_text = 2;
     int32 option_order = 3;
-    bool is_correct = 4;  // Added: is_correct field
+    bool is_correct = 4;
 }
 
 // Submit Quiz Messages
@@ -106,6 +111,7 @@ message SubmitQuizRequest {
     string quiz_id = 1;
     string user_id = 2;
     repeated QuizAnswer answers = 3;
+    int32 duration_seconds = 4;  // Added: time spent on quiz
 }
 
 message QuizAnswer {
@@ -118,10 +124,67 @@ message SubmitQuizResponse {
     int32 score = 2;
     int32 total_points = 3;
     repeated AnswerResult results = 4;
+    string attempt_id = 5;           // Added: ID of saved attempt
+    bool is_new_best = 6;            // Added: true if this is a new best score
+    int32 previous_best_score = 7;   // Added: previous best score (0 if first attempt)
 }
 
 message AnswerResult {
     string question_id = 1;
     bool is_correct = 2;
     int32 points_earned = 3;
+}
+
+// =====================================================
+// Attempt-related Messages
+// =====================================================
+
+// Get all attempts for a user
+message GetUserAttemptsRequest {
+    string user_id = 1;
+    int32 limit = 2;  // Optional: limit number of results (default 20)
+}
+
+message GetUserAttemptsResponse {
+    repeated AttemptSummary attempts = 1;
+}
+
+message AttemptSummary {
+    string attempt_id = 1;
+    string quiz_id = 2;
+    string quiz_title = 3;
+    int32 score = 4;
+    int32 total_points = 5;
+    int32 correct_count = 6;
+    int32 total_count = 7;
+    int32 duration_seconds = 8;
+    string completed_at = 9;
+    bool is_best_attempt = 10;
+    double percentage = 11;
+}
+
+// Get attempts for a specific quiz by a user
+message GetQuizAttemptsRequest {
+    string user_id = 1;
+    string quiz_id = 2;
+}
+
+message GetQuizAttemptsResponse {
+    repeated AttemptSummary attempts = 1;
+    AttemptSummary best_attempt = 2;  // The best attempt (if exists)
+    int32 attempt_count = 3;
+}
+
+// Get user statistics
+message GetUserStatsRequest {
+    string user_id = 1;
+}
+
+message GetUserStatsResponse {
+    int32 total_score = 1;           // Sum of best scores across all quizzes
+    int32 quizzes_taken = 2;         // Number of unique quizzes attempted
+    int32 total_attempts = 3;        // Total number of attempts
+    int32 quizzes_created = 4;       // Number of quizzes created by user
+    double average_percentage = 5;   // Average score percentage across best attempts
+    repeated AttemptSummary recent_attempts = 6;  // Last 5 attempts
 }
