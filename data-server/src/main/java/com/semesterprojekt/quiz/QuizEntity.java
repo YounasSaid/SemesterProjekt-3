@@ -24,17 +24,17 @@ public class QuizEntity
 
   @Id
   @UuidGenerator
-  @Column(columnDefinition = "citext", name = "id", nullable = false, updatable = false)
+  @Column( name = "id", nullable = false, updatable = false)
   private UUID id;
 
   @Column(columnDefinition = "citext", name = "title", nullable = false)
   private String title;
 
-  @Column(columnDefinition = "uuid", name = "created_by", nullable = false)
+  @Column( name = "created_by", nullable = false)
   private UUID createdBy;
 
   @CreationTimestamp
-  @Column(columnDefinition = "citext", name = "created_at", nullable = false, updatable = false)
+  @Column( name = "created_at", nullable = false, updatable = false)
   private OffsetDateTime createdAt;
 
   @OneToMany(mappedBy = "quiz", cascade = CascadeType.ALL, orphanRemoval = true)

@@ -17,4 +17,8 @@ public interface QuizRepository extends JpaRepository<QuizEntity, UUID> {
   // Use @EntityGraph to fetch both questions and options (avoids MultipleBagFetchException)
   @EntityGraph(attributePaths = {"questions", "questions.options"})
   Optional<QuizEntity> findById(UUID id);
+
+  // Add to QuizRepository.java
+  @Query("SELECT DISTINCT q FROM QuizEntity q LEFT JOIN FETCH q.questions WHERE q.createdBy != :userId")
+  List<QuizEntity> findByCreatedByNotWithQuestions(@Param("userId") UUID userId);
 }

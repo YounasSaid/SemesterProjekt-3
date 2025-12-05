@@ -1,0 +1,261 @@
+@page "/profile"
+@using AppServer.Models
+@using AppServer.Services
+@inject NavigationManager Nav
+@inject SimpleAuthService AuthService
+@inject QuizGrpcClient QuizClient
+@inject IJSRuntime JSRuntime
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Min Profil</PageTitle>
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-10 mx-auto">
+            @if (_loading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                        <span class="visually-hidden">Indlæser...</span>
+                    </div>
+                    <p class="mt-3 text-muted">Henter profil...</p>
+                </div>
+            }
+            else if (_error != null)
+            {
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    <strong>Fejl:</strong> @_error
+                </div>
+            }
+            else if (_stats != null)
+            {
+                <!-- Header -->
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-auto">
+                                <div class="rounded-circle bg-primary d-flex align-items-center justify-content-center" 
+                                     style="width: 80px; height: 80px;">
+                                    <i class="bi bi-person-fill text-white" style="font-size: 2.5rem;"></i>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <h2 class="mb-1">Min Profil</h2>
+                                <p class="text-muted mb-0">
+                                    <i class="bi bi-trophy-fill text-warning"></i>
+                                    Total Score: <strong class="text-primary fs-4">@_stats.TotalScore</strong> point
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <div class="card h-100 border-primary">
+                            <div class="card-body text-center">
+                                <i class="bi bi-trophy text-primary" style="font-size: 2rem;"></i>
+                                <h3 class="mt-2 mb-0">@_stats.TotalScore</h3>
+                                <small class="text-muted">Total Score</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card h-100 border-success">
+                            <div class="card-body text-center">
+                                <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
+                                <h3 class="mt-2 mb-0">@_stats.QuizzesTaken</h3>
+                                <small class="text-muted">Quizzer Gennemført</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card h-100 border-info">
+                            <div class="card-body text-center">
+                                <i class="bi bi-arrow-repeat text-info" style="font-size: 2rem;"></i>
+                                <h3 class="mt-2 mb-0">@_stats.TotalAttempts</h3>
+                                <small class="text-muted">Forsøg i Alt</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card h-100 border-warning">
+                            <div class="card-body text-center">
+                                <i class="bi bi-pencil-square text-warning" style="font-size: 2rem;"></i>
+                                <h3 class="mt-2 mb-0">@_stats.QuizzesCreated</h3>
+                                <small class="text-muted">Quizzer Oprettet</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Average Performance -->
+                @if (_stats.QuizzesTaken > 0)
+                {
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="bi bi-graph-up text-primary me-2"></i>
+                                Gennemsnitlig Præstation
+                            </h5>
+                            <div class="progress" style="height: 30px;">
+                                @{
+                                    var avgClass = _stats.AveragePercentage >= 80 ? "bg-success" : 
+                                                  (_stats.AveragePercentage >= 50 ? "bg-warning" : "bg-danger");
+                                }
+                                <div class="progress-bar @avgClass" 
+                                     role="progressbar" 
+                                     style="width: @_stats.AveragePercentage%;">
+                                    @_stats.AveragePercentage.ToString("F1")%
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <!-- Recent Attempts -->
+                <div class="card">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0">
+                            <i class="bi bi-clock-history text-primary me-2"></i>
+                            Seneste Forsøg
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        @if (_stats.RecentAttempts.Any())
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Quiz</th>
+                                            <th class="text-center">Score</th>
+                                            <th class="text-center">Resultat</th>
+                                            <th class="text-center">Tid</th>
+                                            <th class="text-center">Dato</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var attempt in _stats.RecentAttempts)
+                                        {
+                                            var resultClass = attempt.Percentage >= 80 ? "text-success" : 
+                                                             (attempt.Percentage >= 50 ? "text-warning" : "text-danger");
+                                            
+                                            <tr>
+                                                <td>
+                                                    @attempt.QuizTitle
+                                                    @if (attempt.IsBestAttempt)
+                                                    {
+                                                        <span class="badge bg-success ms-2">
+                                                            <i class="bi bi-star-fill"></i> Bedste
+                                                        </span>
+                                                    }
+                                                </td>
+                                                <td class="text-center">
+                                                    <strong>@attempt.Score</strong> / @attempt.TotalPoints
+                                                </td>
+                                                <td class="text-center @resultClass">
+                                                    <strong>@attempt.Percentage.ToString("F0")%</strong>
+                                                </td>
+                                                <td class="text-center">
+                                                    <small>@attempt.FormattedDuration</small>
+                                                </td>
+                                                <td class="text-center">
+                                                    <small>@attempt.CompletedAt.ToString("dd/MM HH:mm")</small>
+                                                </td>
+                                                <td class="text-end">
+                                                    <a href="/quiz/@attempt.QuizId/take" class="btn btn-sm btn-outline-primary">
+                                                        <i class="bi bi-arrow-repeat"></i>
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-center py-4">
+                                <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+                                <p class="text-muted mt-2">Du har ikke gennemført nogen quizzer endnu</p>
+                                <a href="/myquizzes" class="btn btn-primary">
+                                    <i class="bi bi-play-circle me-2"></i>
+                                    Tag en quiz
+                                </a>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private UserStatsDto? _stats;
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStats();
+    }
+
+    private async Task LoadStats()
+    {
+        _loading = true;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            // Get userId from LocalStorage first, then AuthService
+            string? userIdString = null;
+            
+            try
+            {
+                userIdString = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userId");
+            }
+            catch { }
+            
+            if (string.IsNullOrEmpty(userIdString))
+            {
+                userIdString = AuthService.GetUserId();
+            }
+            
+            if (string.IsNullOrEmpty(userIdString))
+            {
+                Nav.NavigateTo("/login");
+                return;
+            }
+
+            if (!Guid.TryParse(userIdString, out var userId))
+            {
+                Nav.NavigateTo("/login");
+                return;
+            }
+
+            AuthService.SetUserId(userIdString);
+
+            _stats = await QuizClient.GetUserStatsAsync(userId);
+
+            if (_stats == null)
+            {
+                _error = "Kunne ikke hente profil data.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Der opstod en fejl: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+}

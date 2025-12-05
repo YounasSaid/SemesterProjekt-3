@@ -104,18 +104,18 @@
                                         Oprettet: @quiz.CreatedAt.ToString("dd/MM/yyyy HH:mm")
                                     </p>
                                     
-                                    <div class="mt-auto d-flex gap-2">
-                                        <button class="btn btn-sm btn-outline-success" 
+                                    <div class="mt-auto d-flex gap-2 flex-wrap">
+                                        <button class="btn btn-sm btn-outline-info flex-grow-1"
+                                                @onclick="() => ViewQuiz(quiz.QuizId)">
+                                            <i class="bi bi-eye"></i> Se
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-success flex-grow-1"
                                                 @onclick="() => EditQuiz(quiz.QuizId)">
                                             <i class="bi bi-pencil"></i> Rediger
                                         </button>
-                                        <button class="btn btn-sm btn-outline-primary flex-grow-1" 
-                                                @onclick="() => ViewQuiz(quiz.QuizId)">
-                                            <i class="bi bi-play-circle"></i> Test Quiz
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-danger" 
+                                        <button class="btn btn-sm btn-outline-danger flex-grow-1"
                                                 @onclick="() => ShowDeleteConfirmation(quiz)">
-                                            <i class="bi bi-trash"></i>
+                                            <i class="bi bi-trash"></i> Slet
                                         </button>
                                     </div>
                                 </div>
@@ -286,13 +286,11 @@
 
     private void ViewQuiz(Guid quizId)
     {
-        // TODO: Create quiz view/preview page
         Nav.NavigateTo($"/quiz/{quizId}/view");
     }
-    
+
     private void EditQuiz(Guid quizId)
     {
-        // TODO: Create quiz edit page
         Nav.NavigateTo($"/quiz/{quizId}/edit");
     }
 

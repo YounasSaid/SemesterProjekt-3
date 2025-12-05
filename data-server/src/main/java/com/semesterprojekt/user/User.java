@@ -17,6 +17,7 @@ import java.util.UUID;
  * Vigtigste felter:
  *   - id: Primærnøgle (UUID genereres automatisk)
  *   - email, firstName, lastName, passwordHash, semester
+ *   - totalScore: Sum af bedste scores på alle quizzer
  *   - createdAt: tidspunkt for oprettelse
  *
  * Bruges af:
@@ -28,32 +29,35 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "users", indexes = {
-        @Index(name = "ux_users_email_lower", columnList = "email", unique = false) // DB har unik index på lower(email)
+        @Index(name = "ux_users_email_lower", columnList = "email", unique = false)
 })
 public class User {
 
   @Id
   @UuidGenerator
-  @Column(columnDefinition = "citext", name = "id", nullable = false, updatable = false)
+  @Column(name = "id", nullable = false, updatable = false)
   private UUID id;
 
-  @Column(columnDefinition = "citext", name = "email", nullable = false)
+  @Column(name = "email", nullable = false)
   private String email;
 
-  @Column(columnDefinition = "citext", name = "first_name", nullable = false)
+  @Column(name = "first_name", nullable = false)
   private String firstName;
 
-  @Column(columnDefinition = "citext", name = "last_name", nullable = false)
+  @Column(name = "last_name", nullable = false)
   private String lastName;
 
-  @Column(columnDefinition = "citext", name = "password_hash", nullable = false)
+  @Column(name = "password_hash", nullable = false)
   private String passwordHash;
 
-  @Column(columnDefinition = "citext", name = "semester", nullable = false)
+  @Column(name = "semester", nullable = false)
   private short semester;
 
+  @Column(name = "total_score", nullable = false)
+  private int totalScore = 0;
+
   @CreationTimestamp
-  @Column(columnDefinition = "citext", name = "created_at", nullable = false, updatable = false)
+  @Column(name = "created_at", nullable = false, updatable = false)
   private OffsetDateTime createdAt;
 
   // --- getters/setters ---
@@ -76,6 +80,13 @@ public class User {
   public short getSemester() { return semester; }
   public void setSemester(short semester) { this.semester = semester; }
 
+  public int getTotalScore() { return totalScore; }
+  public void setTotalScore(int totalScore) { this.totalScore = totalScore; }
+
   public OffsetDateTime getCreatedAt() { return createdAt; }
   public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
+
+  public String getFullName() {
+    return firstName + " " + lastName;
+  }
 }

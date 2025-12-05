@@ -26,10 +26,6 @@ public class QuizGrpcClient : IDisposable
     /// <summary>
     /// Creates a new quiz with questions and options
     /// </summary>
-    /// <param name="userId">ID of the user creating the quiz</param>
-    /// <param name="title">Title of the quiz</param>
-    /// <param name="questions">List of questions with options</param>
-    /// <returns>CreateQuizResultDto if successful, null otherwise</returns>
     public async Task<CreateQuizResultDto?> CreateQuizAsync(
         Guid userId, 
         string title, 
@@ -37,17 +33,14 @@ public class QuizGrpcClient : IDisposable
     {
         try
         {
-            // Convert userId to string
             var userIdString = userId.ToString();
 
-            // Build the CreateQuizRequest (PROTOBUF version)
             var request = new SemesterProjekt.Proto.Quiz.CreateQuizRequest
             {
                 CreatedBy = userIdString,
                 Title = title
             };
 
-            // Map questions to protobuf messages
             foreach (var question in questions)
             {
                 var protoQuestion = new SemesterProjekt.Proto.Quiz.CreateQuizQuestion
@@ -57,7 +50,6 @@ public class QuizGrpcClient : IDisposable
                     Points = question.Points
                 };
 
-                // Map options to protobuf messages
                 foreach (var option in question.Options)
                 {
                     protoQuestion.Options.Add(new SemesterProjekt.Proto.Quiz.CreateQuestionOption
@@ -71,17 +63,14 @@ public class QuizGrpcClient : IDisposable
                 request.Questions.Add(protoQuestion);
             }
 
-            // Call gRPC service
             var response = await _quizClient.CreateQuizAsync(request);
 
-            // Check for errors
             if (!response.Success)
             {
                 _logger.LogError("Failed to create quiz: {ErrorMessage}", response.ErrorMessage);
                 return null;
             }
 
-            // Map response to DTO
             return new CreateQuizResultDto
             {
                 QuizId = Guid.Parse(response.QuizId),
@@ -90,19 +79,9 @@ public class QuizGrpcClient : IDisposable
                 TotalPoints = response.TotalPoints
             };
         }
-        catch (Grpc.Core.RpcException ex) when (ex.StatusCode == Grpc.Core.StatusCode.InvalidArgument)
-        {
-            _logger.LogError(ex, "Invalid argument when creating quiz");
-            return null;
-        }
-        catch (Grpc.Core.RpcException ex)
-        {
-            _logger.LogError(ex, "gRPC error when creating quiz");
-            return null;
-        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error when creating quiz");
+            _logger.LogError(ex, "Error creating quiz");
             return null;
         }
     }
@@ -110,54 +89,44 @@ public class QuizGrpcClient : IDisposable
     /// <summary>
     /// Deletes a quiz (only if the user is the creator)
     /// </summary>
-    /// <param name="userId">ID of the user attempting to delete</param>
-    /// <param name="quizId">ID of the quiz to delete</param>
-    /// <returns>Tuple with success status and message</returns>
     public async Task<(bool success, string message)> DeleteQuizAsync(Guid userId, Guid quizId)
     {
         try
         {
-            // Convert GUIDs to strings
             var request = new SemesterProjekt.Proto.Quiz.DeleteQuizRequest
             {
                 UserId = userId.ToString(),
                 QuizId = quizId.ToString()
             };
 
-            // Call gRPC service
             var response = await _quizClient.DeleteQuizAsync(request);
-
             return (response.Success, response.Message);
-        }
-        catch (Grpc.Core.RpcException ex)
-        {
-            _logger.LogError(ex, "gRPC error when deleting quiz");
-            return (false, "Error deleting quiz");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error when deleting quiz");
+            _logger.LogError(ex, "Error deleting quiz");
             return (false, "Error deleting quiz");
         }
     }
-
+    
+    // Add to QuizGrpcClient.cs
     /// <summary>
-    /// Gets all quizzes created by a specific user
+    /// Gets all quizzes NOT created by the specified user (available to play)
     /// </summary>
     /// <param name="userId">ID of the user</param>
-    /// <returns>List of quiz summaries</returns>
-    public async Task<List<QuizSummaryDto>> GetUserQuizzesAsync(Guid userId)
+    /// <returns>List of quiz summaries from other users</returns>
+    public async Task<List<QuizSummaryDto>> GetAvailableQuizzesAsync(Guid userId)
     {
         try
         {
             // Convert userId to string
-            var request = new SemesterProjekt.Proto.Quiz.GetUserQuizzesRequest
+            var request = new SemesterProjekt.Proto.Quiz.GetAvailableQuizzesRequest
             {
                 UserId = userId.ToString()
             };
 
             // Call gRPC service
-            var response = await _quizClient.GetUserQuizzesAsync(request);
+            var response = await _quizClient.GetAvailableQuizzesAsync(request);
 
             // Map response to DTOs
             var quizzes = new List<QuizSummaryDto>();
@@ -177,12 +146,48 @@ public class QuizGrpcClient : IDisposable
         }
         catch (Grpc.Core.RpcException ex)
         {
-            _logger.LogError(ex, "gRPC error when getting user quizzes");
+            _logger.LogError(ex, "gRPC error when getting available quizzes");
             return new List<QuizSummaryDto>();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error when getting user quizzes");
+            _logger.LogError(ex, "Unexpected error when getting available quizzes");
+            return new List<QuizSummaryDto>();
+        }
+    }
+
+    /// <summary>
+    /// Gets all quizzes created by a specific user
+    /// </summary>
+    public async Task<List<QuizSummaryDto>> GetUserQuizzesAsync(Guid userId)
+    {
+        try
+        {
+            var request = new SemesterProjekt.Proto.Quiz.GetUserQuizzesRequest
+            {
+                UserId = userId.ToString()
+            };
+
+            var response = await _quizClient.GetUserQuizzesAsync(request);
+
+            var quizzes = new List<QuizSummaryDto>();
+            foreach (var quiz in response.Quizzes)
+            {
+                quizzes.Add(new QuizSummaryDto
+                {
+                    QuizId = Guid.Parse(quiz.QuizId),
+                    Title = quiz.Title,
+                    QuestionCount = quiz.QuestionCount,
+                    TotalPoints = quiz.TotalPoints,
+                    CreatedAt = DateTime.Parse(quiz.CreatedAt)
+                });
+            }
+
+            return quizzes;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting user quizzes");
             return new List<QuizSummaryDto>();
         }
     }
@@ -190,9 +195,6 @@ public class QuizGrpcClient : IDisposable
     /// <summary>
     /// Gets full details of a specific quiz with all questions and options
     /// </summary>
-    /// <param name="quizId">ID of the quiz</param>
-    /// <param name="userId">ID of the requesting user</param>
-    /// <returns>QuizDetailsDto if found and user has access, null otherwise</returns>
     public async Task<QuizDetailsDto?> GetQuizAsync(Guid quizId, Guid userId)
     {
         try
@@ -203,7 +205,6 @@ public class QuizGrpcClient : IDisposable
                 UserId = userId.ToString()
             };
 
-            // Call gRPC service
             var response = await _quizClient.GetQuizAsync(request);
 
             if (response == null || !response.Found)
@@ -211,7 +212,6 @@ public class QuizGrpcClient : IDisposable
                 return null;
             }
 
-            // Map to DTO
             var quiz = new QuizDetailsDto
             {
                 QuizId = Guid.Parse(response.QuizId),
@@ -248,16 +248,165 @@ public class QuizGrpcClient : IDisposable
 
             return quiz;
         }
-        catch (Grpc.Core.RpcException ex)
+        catch (Exception ex)
         {
-            _logger.LogError(ex, "gRPC error when getting quiz {QuizId}", quizId);
+            _logger.LogError(ex, "Error getting quiz {QuizId}", quizId);
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Submits quiz answers and returns the graded result (with duration)
+    /// </summary>
+    public async Task<QuizSubmissionResultDto?> SubmitQuizAsync(
+        Guid quizId, 
+        Guid userId, 
+        List<QuizAnswerDto> answers,
+        int durationSeconds = 0)
+    {
+        try
+        {
+            var request = new SemesterProjekt.Proto.Quiz.SubmitQuizRequest
+            {
+                QuizId = quizId.ToString(),
+                UserId = userId.ToString(),
+                DurationSeconds = durationSeconds
+            };
+
+            foreach (var answer in answers)
+            {
+                request.Answers.Add(new SemesterProjekt.Proto.Quiz.QuizAnswer
+                {
+                    QuestionId = answer.QuestionId.ToString(),
+                    SelectedOptionId = answer.SelectedOptionId.ToString()
+                });
+            }
+
+            var response = await _quizClient.SubmitQuizAsync(request);
+
+            if (!response.Success)
+            {
+                _logger.LogError("Failed to submit quiz {QuizId}", quizId);
+                return null;
+            }
+
+            var result = new QuizSubmissionResultDto
+            {
+                Success = response.Success,
+                Score = response.Score,
+                TotalPoints = response.TotalPoints,
+                Percentage = response.TotalPoints > 0 
+                    ? (double)response.Score / response.TotalPoints * 100 
+                    : 0,
+                AttemptId = response.AttemptId,
+                IsNewBest = response.IsNewBest,
+                PreviousBestScore = response.PreviousBestScore,
+                Results = new List<AnswerResultDto>()
+            };
+
+            foreach (var r in response.Results)
+            {
+                result.Results.Add(new AnswerResultDto
+                {
+                    QuestionId = Guid.Parse(r.QuestionId),
+                    IsCorrect = r.IsCorrect,
+                    PointsEarned = r.PointsEarned
+                });
+            }
+
+            return result;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error when getting quiz {QuizId}", quizId);
+            _logger.LogError(ex, "Error submitting quiz {QuizId}", quizId);
             return null;
         }
+    }
+
+    /// <summary>
+    /// Gets user statistics (total score, quizzes taken, etc.)
+    /// </summary>
+    public async Task<UserStatsDto?> GetUserStatsAsync(Guid userId)
+    {
+        try
+        {
+            var request = new GetUserStatsRequest
+            {
+                UserId = userId.ToString()
+            };
+
+            var response = await _quizClient.GetUserStatsAsync(request);
+
+            var stats = new UserStatsDto
+            {
+                TotalScore = response.TotalScore,
+                QuizzesTaken = response.QuizzesTaken,
+                TotalAttempts = response.TotalAttempts,
+                QuizzesCreated = response.QuizzesCreated,
+                AveragePercentage = response.AveragePercentage,
+                RecentAttempts = new List<AttemptSummaryDto>()
+            };
+
+            foreach (var attempt in response.RecentAttempts)
+            {
+                stats.RecentAttempts.Add(MapAttemptSummary(attempt));
+            }
+
+            return stats;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting user stats");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Gets all attempts for a user
+    /// </summary>
+    public async Task<List<AttemptSummaryDto>> GetUserAttemptsAsync(Guid userId, int limit = 20)
+    {
+        try
+        {
+            var request = new GetUserAttemptsRequest
+            {
+                UserId = userId.ToString(),
+                Limit = limit
+            };
+
+            var response = await _quizClient.GetUserAttemptsAsync(request);
+
+            var attempts = new List<AttemptSummaryDto>();
+            foreach (var attempt in response.Attempts)
+            {
+                attempts.Add(MapAttemptSummary(attempt));
+            }
+
+            return attempts;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting user attempts");
+            return new List<AttemptSummaryDto>();
+        }
+    }
+
+    private AttemptSummaryDto MapAttemptSummary(AttemptSummary attempt)
+    {
+        return new AttemptSummaryDto
+        {
+            AttemptId = Guid.Parse(attempt.AttemptId),
+            QuizId = Guid.Parse(attempt.QuizId),
+            QuizTitle = attempt.QuizTitle,
+            Score = attempt.Score,
+            TotalPoints = attempt.TotalPoints,
+            CorrectCount = attempt.CorrectCount,
+            TotalCount = attempt.TotalCount,
+            DurationSeconds = attempt.DurationSeconds,
+            CompletedAt = DateTime.Parse(attempt.CompletedAt),
+            IsBestAttempt = attempt.IsBestAttempt,
+            Percentage = attempt.Percentage
+        };
     }
 
     public void Dispose()
