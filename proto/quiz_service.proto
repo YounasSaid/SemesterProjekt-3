@@ -9,9 +9,10 @@ service QuizService {
     rpc CreateQuiz (CreateQuizRequest) returns (CreateQuizResponse);
     rpc DeleteQuiz (DeleteQuizRequest) returns (DeleteQuizResponse);
     rpc GetUserQuizzes (GetUserQuizzesRequest) returns (GetUserQuizzesResponse);
+    rpc GetAvailableQuizzes (GetAvailableQuizzesRequest) returns (GetAvailableQuizzesResponse);
     rpc GetQuiz (GetQuizRequest) returns (GetQuizResponse);
     rpc SubmitQuiz (SubmitQuizRequest) returns (SubmitQuizResponse);
-    
+
     // Attempt-related RPCs
     rpc GetUserAttempts (GetUserAttemptsRequest) returns (GetUserAttemptsResponse);
     rpc GetQuizAttempts (GetQuizAttemptsRequest) returns (GetQuizAttemptsResponse);
@@ -64,6 +65,15 @@ message GetUserQuizzesRequest {
 }
 
 message GetUserQuizzesResponse {
+    repeated QuizSummary quizzes = 1;
+}
+
+// Get Available Quizzes Messages (quizzes NOT created by user)
+message GetAvailableQuizzesRequest {
+    string user_id = 1;
+}
+
+message GetAvailableQuizzesResponse {
     repeated QuizSummary quizzes = 1;
 }
 
