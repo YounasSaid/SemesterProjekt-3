@@ -409,6 +409,38 @@ public class QuizGrpcClient : IDisposable
         };
     }
 
+    /// <summary>
+    /// Gets scoreboard with all users' total scores
+    /// </summary>
+    public async Task<List<ScoreboardEntryDto>> GetScoreboardAsync()
+    {
+        try
+        {
+            var request = new GetScoreboardRequest();
+            var response = await _quizClient.GetScoreboardAsync(request);
+
+            var scoreboard = new List<ScoreboardEntryDto>();
+            foreach (var entry in response.Entries)
+            {
+                scoreboard.Add(new ScoreboardEntryDto
+                {
+                    UserId = Guid.Parse(entry.UserId),
+                    FirstName = entry.FirstName,
+                    LastName = entry.LastName,
+                    TotalScore = entry.TotalScore,
+                    QuizzesTaken = entry.QuizzesTaken
+                });
+            }
+
+            return scoreboard;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting scoreboard");
+            return new List<ScoreboardEntryDto>();
+        }
+    }
+
     public void Dispose()
     {
         _channel?.Dispose();

@@ -4,7 +4,9 @@
 @inject NavigationManager Nav
 @inject SimpleAuthService AuthService
 @inject QuizGrpcClient QuizClient
+@inject UserGrpcClient UserClient
 @inject IJSRuntime JSRuntime
+@inject HttpClient HttpClient
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 
 <PageTitle>Min Profil</PageTitle>
@@ -30,18 +32,38 @@
             }
             else if (_stats != null)
             {
-                <!-- Header -->
+                <!-- Header with User Info -->
                 <div class="card shadow mb-4">
                     <div class="card-body">
                         <div class="row align-items-center">
                             <div class="col-auto">
-                                <div class="rounded-circle bg-primary d-flex align-items-center justify-content-center" 
+                                <div class="rounded-circle bg-primary d-flex align-items-center justify-content-center"
                                      style="width: 80px; height: 80px;">
                                     <i class="bi bi-person-fill text-white" style="font-size: 2.5rem;"></i>
                                 </div>
                             </div>
                             <div class="col">
-                                <h2 class="mb-1">Min Profil</h2>
+                                <h2 class="mb-1">
+                                    @if (_userProfile != null)
+                                    {
+                                        <text>@_userProfile.FirstName @_userProfile.LastName</text>
+                                    }
+                                    else
+                                    {
+                                        <text>Min Profil</text>
+                                    }
+                                </h2>
+                                @if (_userProfile != null)
+                                {
+                                    <p class="text-muted mb-1">
+                                        <i class="bi bi-envelope-fill me-1"></i>
+                                        @_userProfile.Email
+                                    </p>
+                                    <p class="text-muted mb-1">
+                                        <i class="bi bi-calendar-fill me-1"></i>
+                                        Semester: <strong>@_userProfile.Semester</strong>
+                                    </p>
+                                }
                                 <p class="text-muted mb-0">
                                     <i class="bi bi-trophy-fill text-warning"></i>
                                     Total Score: <strong class="text-primary fs-4">@_stats.TotalScore</strong> point
@@ -53,7 +75,7 @@
 
                 <!-- Stats Cards -->
                 <div class="row g-3 mb-4">
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <div class="card h-100 border-primary">
                             <div class="card-body text-center">
                                 <i class="bi bi-trophy text-primary" style="font-size: 2rem;"></i>
@@ -62,7 +84,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <div class="card h-100 border-success">
                             <div class="card-body text-center">
                                 <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
@@ -71,16 +93,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
-                        <div class="card h-100 border-info">
-                            <div class="card-body text-center">
-                                <i class="bi bi-arrow-repeat text-info" style="font-size: 2rem;"></i>
-                                <h3 class="mt-2 mb-0">@_stats.TotalAttempts</h3>
-                                <small class="text-muted">Forsøg i Alt</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <div class="card h-100 border-warning">
                             <div class="card-body text-center">
                                 <i class="bi bi-pencil-square text-warning" style="font-size: 2rem;"></i>
@@ -91,32 +104,8 @@
                     </div>
                 </div>
 
-                <!-- Average Performance -->
-                @if (_stats.QuizzesTaken > 0)
-                {
-                    <div class="card mb-4">
-                        <div class="card-body">
-                            <h5 class="card-title">
-                                <i class="bi bi-graph-up text-primary me-2"></i>
-                                Gennemsnitlig Præstation
-                            </h5>
-                            <div class="progress" style="height: 30px;">
-                                @{
-                                    var avgClass = _stats.AveragePercentage >= 80 ? "bg-success" : 
-                                                  (_stats.AveragePercentage >= 50 ? "bg-warning" : "bg-danger");
-                                }
-                                <div class="progress-bar @avgClass" 
-                                     role="progressbar" 
-                                     style="width: @_stats.AveragePercentage%;">
-                                    @_stats.AveragePercentage.ToString("F1")%
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                }
-
                 <!-- Recent Attempts -->
-                <div class="card">
+                <div class="card mb-4">
                     <div class="card-header bg-light">
                         <h5 class="mb-0">
                             <i class="bi bi-clock-history text-primary me-2"></i>
@@ -135,15 +124,14 @@
                                             <th class="text-center">Resultat</th>
                                             <th class="text-center">Tid</th>
                                             <th class="text-center">Dato</th>
-                                            <th></th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         @foreach (var attempt in _stats.RecentAttempts)
                                         {
-                                            var resultClass = attempt.Percentage >= 80 ? "text-success" : 
+                                            var resultClass = attempt.Percentage >= 80 ? "text-success" :
                                                              (attempt.Percentage >= 50 ? "text-warning" : "text-danger");
-                                            
+
                                             <tr>
                                                 <td>
                                                     @attempt.QuizTitle
@@ -166,11 +154,6 @@
                                                 <td class="text-center">
                                                     <small>@attempt.CompletedAt.ToString("dd/MM HH:mm")</small>
                                                 </td>
-                                                <td class="text-end">
-                                                    <a href="/quiz/@attempt.QuizId/take" class="btn btn-sm btn-outline-primary">
-                                                        <i class="bi bi-arrow-repeat"></i>
-                                                    </a>
-                                                </td>
                                             </tr>
                                         }
                                     </tbody>
@@ -190,6 +173,53 @@
                         }
                     </div>
                 </div>
+
+                <!-- Change Password -->
+                <div class="card">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0">
+                            <i class="bi bi-lock-fill text-primary me-2"></i>
+                            Skift Adgangskode
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        @if (!string.IsNullOrEmpty(_passwordMessage))
+                        {
+                            <div class="alert @(_passwordSuccess ? "alert-success" : "alert-danger") alert-dismissible fade show" role="alert">
+                                @_passwordMessage
+                                <button type="button" class="btn-close" @onclick="() => _passwordMessage = null"></button>
+                            </div>
+                        }
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Nuværende Adgangskode</label>
+                                    <input type="password" class="form-control" @bind="_currentPassword" placeholder="Indtast nuværende adgangskode" />
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Ny Adgangskode</label>
+                                    <input type="password" class="form-control" @bind="_newPassword" placeholder="Indtast ny adgangskode" />
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Bekræft Ny Adgangskode</label>
+                                    <input type="password" class="form-control" @bind="_confirmPassword" placeholder="Bekræft ny adgangskode" />
+                                </div>
+                                <button class="btn btn-primary" @onclick="ChangePassword" disabled="@_changingPassword">
+                                    @if (_changingPassword)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                        <text>Skifter...</text>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-check-circle me-2"></i>
+                                        <text>Skift Adgangskode</text>
+                                    }
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             }
         </div>
     </div>
@@ -197,8 +227,17 @@
 
 @code {
     private UserStatsDto? _stats;
+    private UserProfileDto? _userProfile;
     private bool _loading = true;
     private string? _error;
+
+    // Password change fields
+    private string _currentPassword = "";
+    private string _newPassword = "";
+    private string _confirmPassword = "";
+    private bool _changingPassword = false;
+    private string? _passwordMessage;
+    private bool _passwordSuccess = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -215,18 +254,18 @@
         {
             // Get userId from LocalStorage first, then AuthService
             string? userIdString = null;
-            
+
             try
             {
                 userIdString = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userId");
             }
             catch { }
-            
+
             if (string.IsNullOrEmpty(userIdString))
             {
                 userIdString = AuthService.GetUserId();
             }
-            
+
             if (string.IsNullOrEmpty(userIdString))
             {
                 Nav.NavigateTo("/login");
@@ -241,6 +280,8 @@
 
             AuthService.SetUserId(userIdString);
 
+            // Load both user profile and stats
+            _userProfile = await UserClient.GetUserByIdAsync(userId);
             _stats = await QuizClient.GetUserStatsAsync(userId);
 
             if (_stats == null)
@@ -255,6 +296,92 @@
         finally
         {
             _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ChangePassword()
+    {
+        _passwordMessage = null;
+        _passwordSuccess = false;
+
+        // Validation
+        if (string.IsNullOrWhiteSpace(_currentPassword))
+        {
+            _passwordMessage = "Nuværende adgangskode er påkrævet.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_newPassword))
+        {
+            _passwordMessage = "Ny adgangskode er påkrævet.";
+            return;
+        }
+
+        if (_newPassword.Length < 8)
+        {
+            _passwordMessage = "Ny adgangskode skal være mindst 8 tegn.";
+            return;
+        }
+
+        if (_newPassword != _confirmPassword)
+        {
+            _passwordMessage = "De nye adgangskoder matcher ikke.";
+            return;
+        }
+
+        if (_userProfile == null)
+        {
+            _passwordMessage = "Kunne ikke hente bruger information.";
+            return;
+        }
+
+        _changingPassword = true;
+        StateHasChanged();
+
+        try
+        {
+            var request = new UpdatePasswordRequest
+            {
+                Email = _userProfile.Email,
+                CurrentPassword = _currentPassword,
+                NewPassword = _newPassword,
+                ConfirmNewPassword = _confirmPassword
+            };
+
+            var baseUrl = Nav.BaseUri.TrimEnd('/');
+            var response = await HttpClient.PutAsJsonAsync($"{baseUrl}/api/profile/password", request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                _passwordSuccess = true;
+                _passwordMessage = "Adgangskode blev ændret succesfuldt!";
+
+                // Clear fields
+                _currentPassword = "";
+                _newPassword = "";
+                _confirmPassword = "";
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                if (errorContent.Contains("WRONG_PASSWORD"))
+                {
+                    _passwordMessage = "Nuværende adgangskode er forkert.";
+                }
+                else
+                {
+                    _passwordMessage = "Kunne ikke ændre adgangskode. Prøv igen.";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _passwordMessage = $"Der opstod en fejl: {ex.Message}";
+        }
+        finally
+        {
+            _changingPassword = false;
             StateHasChanged();
         }
     }
