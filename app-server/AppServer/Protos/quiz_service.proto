@@ -17,7 +17,6 @@ service QuizService {
     rpc GetUserAttempts (GetUserAttemptsRequest) returns (GetUserAttemptsResponse);
     rpc GetQuizAttempts (GetQuizAttemptsRequest) returns (GetQuizAttemptsResponse);
     rpc GetUserStats (GetUserStatsRequest) returns (GetUserStatsResponse);
-    rpc GetScoreboard (GetScoreboardRequest) returns (GetScoreboardResponse);
 }
 
 // Create Quiz Messages
@@ -198,21 +197,4 @@ message GetUserStatsResponse {
     int32 quizzes_created = 4;       // Number of quizzes created by user
     double average_percentage = 5;   // Average score percentage across best attempts
     repeated AttemptSummary recent_attempts = 6;  // Last 5 attempts
-}
-
-// Get Scoreboard Messages
-message GetScoreboardRequest {
-    // Empty - gets all users' scores
-}
-
-message GetScoreboardResponse {
-    repeated ScoreboardEntry entries = 1;
-}
-
-message ScoreboardEntry {
-    string user_id = 1;
-    string first_name = 2;
-    string last_name = 3;
-    int32 total_score = 4;
-    int32 quizzes_taken = 5;
 }

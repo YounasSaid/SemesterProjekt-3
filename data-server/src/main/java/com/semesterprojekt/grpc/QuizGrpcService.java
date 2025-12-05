@@ -365,31 +365,43 @@ public class QuizGrpcService extends QuizServiceGrpc.QuizServiceImplBase {
   }
 
   // ----------------------
-  // Get Scoreboard
+  // Get Leaderboard
   // ----------------------
   @Override
-  public void getScoreboard(GetScoreboardRequest request,
-      StreamObserver<GetScoreboardResponse> responseObserver) {
+  public void getLeaderboard(GetLeaderboardRequest request,
+      StreamObserver<GetLeaderboardResponse> responseObserver) {
 
     try {
-      // Get all users from database
-      List<User> users = userRepository.findAll();
+      int limit = request.getLimit() > 0 ? request.getLimit() : 50;
 
-      GetScoreboardResponse.Builder builder = GetScoreboardResponse.newBuilder();
+      // Get all users
+      List<User> allUsers = userRepository.findAll();
 
-      // For each user, calculate their stats
-      for (User user : users) {
-        long quizzesTaken = quizService.countQuizzesTaken(user.getId());
+      // Create leaderboard entries
+      List<LeaderboardEntry> entries = allUsers.stream()
+          .map(user -> {
+            // Count quizzes taken for each user
+            long quizzesTaken = quizService.countQuizzesTaken(user.getId());
 
-        ScoreboardEntry entry = ScoreboardEntry.newBuilder()
-            .setUserId(user.getId().toString())
-            .setFirstName(user.getFirstName())
-            .setLastName(user.getLastName())
-            .setTotalScore(user.getTotalScore())
-            .setQuizzesTaken((int) quizzesTaken)
-            .build();
+            return LeaderboardEntry.newBuilder()
+                .setUserId(user.getId().toString())
+                .setFirstName(user.getFirstName())
+                .setLastName(user.getLastName())
+                .setSemester(user.getSemester())
+                .setTotalScore(user.getTotalScore())
+                .setQuizzesTaken((int) quizzesTaken)
+                .build();
+          })
+          // Sort by total score descending
+          .sorted((e1, e2) -> Integer.compare(e2.getTotalScore(), e1.getTotalScore()))
+          .limit(limit)
+          .collect(java.util.stream.Collectors.toList());
 
-        builder.addEntries(entry);
+      // Add rank to each entry
+      GetLeaderboardResponse.Builder builder = GetLeaderboardResponse.newBuilder();
+      for (int i = 0; i < entries.size(); i++) {
+        LeaderboardEntry entry = entries.get(i);
+        builder.addEntries(entry.toBuilder().setRank(i + 1).build());
       }
 
       responseObserver.onNext(builder.build());
@@ -397,7 +409,7 @@ public class QuizGrpcService extends QuizServiceGrpc.QuizServiceImplBase {
 
     } catch (Exception ex) {
       responseObserver.onError(
-          Status.INTERNAL.withDescription("Failed to get scoreboard: " + ex.getMessage())
+          Status.INTERNAL.withDescription("Failed to get leaderboard: " + ex.getMessage())
               .asRuntimeException()
       );
     }

@@ -17,6 +17,7 @@ service QuizService {
     rpc GetUserAttempts (GetUserAttemptsRequest) returns (GetUserAttemptsResponse);
     rpc GetQuizAttempts (GetQuizAttemptsRequest) returns (GetQuizAttemptsResponse);
     rpc GetUserStats (GetUserStatsRequest) returns (GetUserStatsResponse);
+    rpc GetLeaderboard (GetLeaderboardRequest) returns (GetLeaderboardResponse);
 }
 
 // Create Quiz Messages
@@ -197,4 +198,23 @@ message GetUserStatsResponse {
     int32 quizzes_created = 4;       // Number of quizzes created by user
     double average_percentage = 5;   // Average score percentage across best attempts
     repeated AttemptSummary recent_attempts = 6;  // Last 5 attempts
+}
+
+// Get leaderboard
+message GetLeaderboardRequest {
+    int32 limit = 1;  // Optional: limit number of results (default 50)
+}
+
+message GetLeaderboardResponse {
+    repeated LeaderboardEntry entries = 1;
+}
+
+message LeaderboardEntry {
+    string user_id = 1;
+    string first_name = 2;
+    string last_name = 3;
+    int32 semester = 4;
+    int32 total_score = 5;
+    int32 quizzes_taken = 6;
+    int32 rank = 7;
 }

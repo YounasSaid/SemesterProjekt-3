@@ -391,6 +391,44 @@ public class QuizGrpcClient : IDisposable
         }
     }
 
+    /// <summary>
+    /// Gets the leaderboard with top users ranked by total score
+    /// </summary>
+    public async Task<List<LeaderboardEntryDto>> GetLeaderboardAsync(int limit = 50)
+    {
+        try
+        {
+            var request = new GetLeaderboardRequest
+            {
+                Limit = limit
+            };
+
+            var response = await _quizClient.GetLeaderboardAsync(request);
+
+            var leaderboard = new List<LeaderboardEntryDto>();
+            foreach (var entry in response.Entries)
+            {
+                leaderboard.Add(new LeaderboardEntryDto
+                {
+                    UserId = Guid.Parse(entry.UserId),
+                    FirstName = entry.FirstName,
+                    LastName = entry.LastName,
+                    Semester = entry.Semester,
+                    TotalScore = entry.TotalScore,
+                    QuizzesTaken = entry.QuizzesTaken,
+                    Rank = entry.Rank
+                });
+            }
+
+            return leaderboard;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting leaderboard");
+            return new List<LeaderboardEntryDto>();
+        }
+    }
+
     private AttemptSummaryDto MapAttemptSummary(AttemptSummary attempt)
     {
         return new AttemptSummaryDto
@@ -407,38 +445,6 @@ public class QuizGrpcClient : IDisposable
             IsBestAttempt = attempt.IsBestAttempt,
             Percentage = attempt.Percentage
         };
-    }
-
-    /// <summary>
-    /// Gets scoreboard with all users' total scores
-    /// </summary>
-    public async Task<List<ScoreboardEntryDto>> GetScoreboardAsync()
-    {
-        try
-        {
-            var request = new GetScoreboardRequest();
-            var response = await _quizClient.GetScoreboardAsync(request);
-
-            var scoreboard = new List<ScoreboardEntryDto>();
-            foreach (var entry in response.Entries)
-            {
-                scoreboard.Add(new ScoreboardEntryDto
-                {
-                    UserId = Guid.Parse(entry.UserId),
-                    FirstName = entry.FirstName,
-                    LastName = entry.LastName,
-                    TotalScore = entry.TotalScore,
-                    QuizzesTaken = entry.QuizzesTaken
-                });
-            }
-
-            return scoreboard;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting scoreboard");
-            return new List<ScoreboardEntryDto>();
-        }
     }
 
     public void Dispose()
