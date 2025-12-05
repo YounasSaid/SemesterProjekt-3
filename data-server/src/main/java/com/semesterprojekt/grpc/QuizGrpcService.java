@@ -365,6 +365,45 @@ public class QuizGrpcService extends QuizServiceGrpc.QuizServiceImplBase {
   }
 
   // ----------------------
+  // Get Scoreboard
+  // ----------------------
+  @Override
+  public void getScoreboard(GetScoreboardRequest request,
+      StreamObserver<GetScoreboardResponse> responseObserver) {
+
+    try {
+      // Get all users from database
+      List<User> users = userRepository.findAll();
+
+      GetScoreboardResponse.Builder builder = GetScoreboardResponse.newBuilder();
+
+      // For each user, calculate their stats
+      for (User user : users) {
+        long quizzesTaken = quizService.countQuizzesTaken(user.getId());
+
+        ScoreboardEntry entry = ScoreboardEntry.newBuilder()
+            .setUserId(user.getId().toString())
+            .setFirstName(user.getFirstName())
+            .setLastName(user.getLastName())
+            .setTotalScore(user.getTotalScore())
+            .setQuizzesTaken((int) quizzesTaken)
+            .build();
+
+        builder.addEntries(entry);
+      }
+
+      responseObserver.onNext(builder.build());
+      responseObserver.onCompleted();
+
+    } catch (Exception ex) {
+      responseObserver.onError(
+          Status.INTERNAL.withDescription("Failed to get scoreboard: " + ex.getMessage())
+              .asRuntimeException()
+      );
+    }
+  }
+
+  // ----------------------
   // Helper method
   // ----------------------
   private AttemptSummary buildAttemptSummary(QuizAttempt attempt, String quizTitle) {

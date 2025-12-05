@@ -12,6 +12,7 @@ service QuizService {
     rpc GetQuiz (GetQuizRequest) returns (GetQuizResponse);
     rpc SubmitQuiz (SubmitQuizRequest) returns (SubmitQuizResponse);
     rpc GetAvailableQuizzes (GetAvailableQuizzesRequest) returns (GetAvailableQuizzesResponse);  // NEW
+    rpc GetScoreboard (GetScoreboardRequest) returns (GetScoreboardResponse);  // NEW
 }
 
 // Create Quiz Messages
@@ -134,4 +135,21 @@ message AnswerResult {
     string question_id = 1;
     bool is_correct = 2;
     int32 points_earned = 3;
+}
+
+// Get Scoreboard Messages
+message GetScoreboardRequest {
+    // Empty - gets all users' scores
+}
+
+message GetScoreboardResponse {
+    repeated ScoreboardEntry entries = 1;
+}
+
+message ScoreboardEntry {
+    string user_id = 1;
+    string first_name = 2;
+    string last_name = 3;
+    int32 total_score = 4;
+    int32 quizzes_taken = 5;
 }
