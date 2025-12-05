@@ -1,19 +1,17 @@
 package com.semesterprojekt.grpc;
 
-import com.semesterprojekt.quiz.QuizEntity;
-import com.semesterprojekt.quiz.Question;
-import com.semesterprojekt.quiz.QuestionOptionEntity;
+import com.semesterprojekt.quiz.*;
 import com.semesterprojekt.quiz.service.QuizService;
-
-import com.semesterprojekt.proto.quiz.QuestionOption;
-import com.semesterprojekt.proto.quiz.SubmitQuizResponse;
-
+import com.semesterprojekt.user.User;
+import com.semesterprojekt.user.UserRepository;
 import com.semesterprojekt.proto.quiz.*;
 
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import net.devh.boot.grpc.server.service.GrpcService;
 
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -21,20 +19,20 @@ import java.util.UUID;
  * --------------------------------------------
  * Purpose:
  *   Implements the gRPC API for quiz operations.
- *
- * Responsibilities:
- *   - Receive requests from App server (C#)
- *   - Call QuizService to execute business logic
- *   - Convert domain objects → gRPC responses
- *   - Return success or error status codes
  */
 @GrpcService
 public class QuizGrpcService extends QuizServiceGrpc.QuizServiceImplBase {
 
   private final QuizService quizService;
+  private final QuizRepository quizRepository;
+  private final UserRepository userRepository;
 
-  public QuizGrpcService(QuizService quizService) {
+  public QuizGrpcService(QuizService quizService, 
+                         QuizRepository quizRepository,
+                         UserRepository userRepository) {
     this.quizService = quizService;
+    this.quizRepository = quizRepository;
+    this.userRepository = userRepository;
   }
 
   // ----------------------
@@ -153,8 +151,8 @@ public class QuizGrpcService extends QuizServiceGrpc.QuizServiceImplBase {
           .setQuizId(quiz.getId().toString())
           .setTitle(quiz.getTitle())
           .setCreatedBy(quiz.getCreatedBy().toString())
-          .setCreatedAt(quiz.getCreatedAt().toString())  // Added
-          .setTotalPoints(quizService.calculateTotalPoints(quiz));  // Added
+          .setCreatedAt(quiz.getCreatedAt().toString())
+          .setTotalPoints(quizService.calculateTotalPoints(quiz));
 
       for (Question q : quiz.getQuestions()) {
         QuizQuestion.Builder qBuilder = QuizQuestion.newBuilder()
@@ -169,7 +167,7 @@ public class QuizGrpcService extends QuizServiceGrpc.QuizServiceImplBase {
                   .setOptionId(opt.getId().toString())
                   .setOptionText(opt.getOptionText())
                   .setOptionOrder(opt.getOptionOrder())
-                  .setIsCorrect(opt.isCorrect())  // Added
+                  .setIsCorrect(opt.isCorrect())
           );
         }
 
@@ -187,16 +185,15 @@ public class QuizGrpcService extends QuizServiceGrpc.QuizServiceImplBase {
     }
   }
 
-
   // ----------------------
-  // Submit Quiz
+  // Submit Quiz (grade AND save attempt)
   // ----------------------
   @Override
   public void submitQuiz(SubmitQuizRequest request,
       StreamObserver<SubmitQuizResponse> responseObserver) {
 
     try {
-      SubmitQuizResponse response = quizService.gradeQuiz(request);
+      SubmitQuizResponse response = quizService.gradeAndSaveQuiz(request);
 
       responseObserver.onNext(response);
       responseObserver.onCompleted();
@@ -208,4 +205,183 @@ public class QuizGrpcService extends QuizServiceGrpc.QuizServiceImplBase {
       );
     }
   }
+
+  // ----------------------
+  // Get User Attempts
+  // ----------------------
+  @Override
+  public void getUserAttempts(GetUserAttemptsRequest request,
+      StreamObserver<GetUserAttemptsResponse> responseObserver) {
+
+    try {
+      UUID userId = UUID.fromString(request.getUserId());
+      int limit = request.getLimit() > 0 ? request.getLimit() : 20;
+      
+      List<QuizAttempt> attempts = quizService.getUserAttempts(userId, limit);
+
+      GetUserAttemptsResponse.Builder builder = GetUserAttemptsResponse.newBuilder();
+
+      for (QuizAttempt attempt : attempts) {
+        // Get quiz title
+        String quizTitle = quizRepository.findById(attempt.getQuizId())
+            .map(QuizEntity::getTitle)
+            .orElse("Unknown Quiz");
+
+        builder.addAttempts(buildAttemptSummary(attempt, quizTitle));
+      }
+
+      responseObserver.onNext(builder.build());
+      responseObserver.onCompleted();
+
+    } catch (Exception ex) {
+      responseObserver.onError(
+          Status.INTERNAL.withDescription("Failed to get user attempts: " + ex.getMessage())
+              .asRuntimeException()
+      );
+    }
+  }
+
+  // ----------------------
+  // Get Quiz Attempts
+  // ----------------------
+  @Override
+  public void getQuizAttempts(GetQuizAttemptsRequest request,
+      StreamObserver<GetQuizAttemptsResponse> responseObserver) {
+
+    try {
+      UUID userId = UUID.fromString(request.getUserId());
+      UUID quizId = UUID.fromString(request.getQuizId());
+
+      List<QuizAttempt> attempts = quizService.getQuizAttempts(userId, quizId);
+      Optional<QuizAttempt> bestAttempt = quizService.getBestAttempt(userId, quizId);
+
+      String quizTitle = quizRepository.findById(quizId)
+          .map(QuizEntity::getTitle)
+          .orElse("Unknown Quiz");
+
+      GetQuizAttemptsResponse.Builder builder = GetQuizAttemptsResponse.newBuilder()
+          .setAttemptCount(attempts.size());
+
+      for (QuizAttempt attempt : attempts) {
+        builder.addAttempts(buildAttemptSummary(attempt, quizTitle));
+      }
+
+      bestAttempt.ifPresent(attempt -> 
+          builder.setBestAttempt(buildAttemptSummary(attempt, quizTitle))
+      );
+
+      responseObserver.onNext(builder.build());
+      responseObserver.onCompleted();
+
+    } catch (Exception ex) {
+      responseObserver.onError(
+          Status.INTERNAL.withDescription("Failed to get quiz attempts: " + ex.getMessage())
+              .asRuntimeException()
+      );
+    }
+  }
+
+  // ----------------------
+  // Get User Stats
+  // ----------------------
+  @Override
+  public void getUserStats(GetUserStatsRequest request,
+      StreamObserver<GetUserStatsResponse> responseObserver) {
+
+    try {
+      UUID userId = UUID.fromString(request.getUserId());
+
+      // Get user for total score
+      User user = userRepository.findById(userId).orElse(null);
+      int totalScore = user != null ? user.getTotalScore() : 0;
+
+      // Get statistics
+      long quizzesTaken = quizService.countQuizzesTaken(userId);
+      long totalAttempts = quizService.countTotalAttempts(userId);
+      long quizzesCreated = quizService.countQuizzesCreated(userId);
+
+      // Calculate average percentage from best attempts
+      List<QuizAttempt> recentAttempts = quizService.getUserAttempts(userId, 5);
+      double averagePercentage = recentAttempts.stream()
+          .filter(QuizAttempt::isBestAttempt)
+          .mapToDouble(QuizAttempt::getPercentage)
+          .average()
+          .orElse(0.0);
+
+      GetUserStatsResponse.Builder builder = GetUserStatsResponse.newBuilder()
+          .setTotalScore(totalScore)
+          .setQuizzesTaken((int) quizzesTaken)
+          .setTotalAttempts((int) totalAttempts)
+          .setQuizzesCreated((int) quizzesCreated)
+          .setAveragePercentage(averagePercentage);
+
+      // Add recent attempts
+      for (QuizAttempt attempt : recentAttempts) {
+        String quizTitle = quizRepository.findById(attempt.getQuizId())
+            .map(QuizEntity::getTitle)
+            .orElse("Unknown Quiz");
+        builder.addRecentAttempts(buildAttemptSummary(attempt, quizTitle));
+      }
+
+      responseObserver.onNext(builder.build());
+      responseObserver.onCompleted();
+
+    } catch (Exception ex) {
+      responseObserver.onError(
+          Status.INTERNAL.withDescription("Failed to get user stats: " + ex.getMessage())
+              .asRuntimeException()
+      );
+    }
+  }
+
+  // Add to QuizGrpcService.java
+  @Override
+  public void getAvailableQuizzes(GetAvailableQuizzesRequest request,
+                                  StreamObserver<GetAvailableQuizzesResponse> responseObserver) {
+
+    try {
+      var quizzes = quizService.getAvailableQuizzes(request.getUserId());
+
+      GetAvailableQuizzesResponse.Builder builder = GetAvailableQuizzesResponse.newBuilder();
+
+      quizzes.forEach(q -> builder.addQuizzes(
+              QuizSummary.newBuilder()
+                      .setQuizId(q.getId().toString())
+                      .setTitle(q.getTitle())
+                      .setQuestionCount(q.getQuestions().size())
+                      .setTotalPoints(quizService.calculateTotalPoints(q))
+                      .setCreatedAt(q.getCreatedAt().toString())
+      ));
+
+      responseObserver.onNext(builder.build());
+      responseObserver.onCompleted();
+
+    } catch (Exception ex) {
+      responseObserver.onError(
+              Status.INTERNAL.withDescription("Failed to get available quizzes: " + ex.getMessage())
+                      .asRuntimeException()
+      );
+    }
+  }
+
+  // ----------------------
+  // Helper method
+  // ----------------------
+  private AttemptSummary buildAttemptSummary(QuizAttempt attempt, String quizTitle) {
+    return AttemptSummary.newBuilder()
+        .setAttemptId(attempt.getId().toString())
+        .setQuizId(attempt.getQuizId().toString())
+        .setQuizTitle(quizTitle)
+        .setScore(attempt.getScore())
+        .setTotalPoints(attempt.getTotalPoints())
+        .setCorrectCount(attempt.getCorrectCount())
+        .setTotalCount(attempt.getTotalCount())
+        .setDurationSeconds(attempt.getDurationSeconds())
+        .setCompletedAt(attempt.getCompletedAt().toString())
+        .setIsBestAttempt(attempt.isBestAttempt())
+        .setPercentage(attempt.getPercentage())
+        .build();
+  }
 }
+
+

@@ -1,0 +1,224 @@
+@page "/quizzer"
+@using AppServer.Models
+@using AppServer.Utils
+@using AppServer.Services
+@inject IHttpClientFactory HttpClientFactory
+@inject NavigationManager Nav
+@inject SimpleAuthService AuthService
+@inject IJSRuntime JSRuntime
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Spil Quizzer</PageTitle>
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-10 mx-auto">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2>Spil Quizzer</h2>
+                    <p class="text-muted mb-0">Find og spil quizzer lavet af andre brugere</p>
+                </div>
+            </div>
+
+            <!-- Loading State -->
+            @if (_loading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                        <span class="visually-hidden">Indlæser...</span>
+                    </div>
+                    <p class="mt-3 text-muted">Henter tilgængelige quizzer...</p>
+                </div>
+            }
+
+            <!-- Error State -->
+            @if (_error != null)
+            {
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    <strong>Fejl:</strong> @_error
+                    <button type="button" class="btn-close" @onclick="ClearError"></button>
+                </div>
+                <div class="text-center">
+                    <button class="btn btn-outline-primary" @onclick="LoadQuizzes">
+                        <i class="bi bi-arrow-clockwise"></i> Prøv igen
+                    </button>
+                </div>
+            }
+
+            <!-- Empty State -->
+            @if (!_loading && _error == null && !_availableQuizzes.Any())
+            {
+                <div class="card text-center py-5">
+                    <div class="card-body">
+                        <i class="bi bi-inbox" style="font-size: 4rem; color: #6c757d;"></i>
+                        <h4 class="mt-3">Ingen tilgængelige quizzer</h4>
+                        <p class="text-muted mb-4">Der er ingen quizzer at spille lige nu. Kom tilbage senere!</p>
+                        <a href="/quiz/create" class="btn btn-primary">
+                            <i class="bi bi-plus-circle"></i> Opret Din Egen Quiz
+                        </a>
+                    </div>
+                </div>
+            }
+
+            <!-- Quiz Grid -->
+            @if (!_loading && _error == null && _availableQuizzes.Any())
+            {
+                <div class="mb-3 text-muted">
+                    <i class="bi bi-info-circle"></i> Viser @_availableQuizzes.Count quiz@(_availableQuizzes.Count != 1 ? "zer" : "") at spille
+                </div>
+
+                <div class="row g-3">
+                    @foreach (var quiz in _availableQuizzes)
+                    {
+                        <div class="col-md-6 col-lg-4">
+                            <div class="card h-100 shadow-sm hover-card">
+                                <div class="card-body d-flex flex-column">
+                                    <h5 class="card-title mb-3">
+                                        <i class="bi bi-journal-text text-primary"></i>
+                                        @quiz.Title
+                                    </h5>
+
+                                    <div class="mb-3">
+                                        <span class="badge bg-primary me-2">
+                                            <i class="bi bi-question-circle"></i>
+                                            @quiz.QuestionCount spørgsmål
+                                        </span>
+                                        <span class="badge bg-success">
+                                            <i class="bi bi-trophy"></i>
+                                            @quiz.TotalPoints point
+                                        </span>
+                                    </div>
+
+                                    <p class="text-muted small mb-3">
+                                        <i class="bi bi-calendar3"></i>
+                                        Oprettet: @quiz.CreatedAt.ToString("dd/MM/yyyy HH:mm")
+                                    </p>
+
+                                    <div class="mt-auto">
+                                        <button class="btn btn-primary w-100"
+                                                @onclick="() => PlayQuiz(quiz.QuizId)">
+                                            <i class="bi bi-play-circle-fill"></i> Spil Quiz
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+    .hover-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .hover-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+</style>
+
+@code {
+    private List<QuizSummaryDto> _availableQuizzes = new();
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine("=== QUIZZER: OnInitializedAsync START ===");
+
+        // TRY LOCALSTORAGE FIRST, then fall back to AuthService
+        string? userIdString = null;
+
+        try
+        {
+            userIdString = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userId");
+            Console.WriteLine($"🔍 QUIZZER: LocalStorage UserId={userIdString ?? "NULL"}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠️ QUIZZER: LocalStorage error: {ex.Message}");
+        }
+
+        if (string.IsNullOrEmpty(userIdString))
+        {
+            userIdString = AuthService.GetUserId();
+            Console.WriteLine($"🔍 QUIZZER: AuthService UserId={userIdString ?? "NULL"}");
+        }
+
+        if (string.IsNullOrEmpty(userIdString))
+        {
+            Console.WriteLine("❌ QUIZZER: No userId - redirecting to login");
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        await LoadQuizzes();
+    }
+
+    private async Task LoadQuizzes()
+    {
+        _loading = true;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            var httpClient = HttpClientFactory.CreateClient();
+            httpClient.BaseAddress = new Uri(Nav.BaseUri);
+
+            var response = await httpClient.GetAsync("/api/quizmanagement/available");
+
+            if (response.IsSuccessStatusCode)
+            {
+                _availableQuizzes = await response.Content.ReadFromJsonAsync<List<QuizSummaryDto>>() ?? new();
+
+                // Sort by created date (newest first)
+                _availableQuizzes = _availableQuizzes.OrderByDescending(q => q.CreatedAt).ToList();
+
+                Console.WriteLine($"✅ QUIZZER: Loaded {_availableQuizzes.Count} available quizzes");
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                Nav.NavigateTo("/login");
+                return;
+            }
+            else
+            {
+                _error = "Kunne ikke indlæse tilgængelige quizzer. Prøv igen senere.";
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            _error = $"Netværksfejl: Kunne ikke oprette forbindelse til serveren.";
+            Console.WriteLine($"❌ QUIZZER: HttpRequestException: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            _error = $"Der opstod en uventet fejl ved indlæsning af quizzer.";
+            Console.WriteLine($"❌ QUIZZER: Exception: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void PlayQuiz(Guid quizId)
+    {
+        // Navigate to take quiz page
+        Nav.NavigateTo($"/quiz/{quizId}/take");
+    }
+
+    private void ClearError()
+    {
+        _error = null;
+        StateHasChanged();
+    }
+}

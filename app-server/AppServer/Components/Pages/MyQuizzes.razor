@@ -105,21 +105,17 @@
                                     </p>
                                     
                                     <div class="mt-auto d-flex gap-2 flex-wrap">
-                                        <button class="btn btn-sm btn-primary flex-grow-1" 
-                                                @onclick="() => TakeQuiz(quiz.QuizId)">
-                                            <i class="bi bi-play-fill"></i> Tag Quiz
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-info" 
+                                        <button class="btn btn-sm btn-outline-info flex-grow-1"
                                                 @onclick="() => ViewQuiz(quiz.QuizId)">
-                                            <i class="bi bi-eye"></i>
+                                            <i class="bi bi-eye"></i> Se
                                         </button>
-                                        <button class="btn btn-sm btn-outline-success" 
+                                        <button class="btn btn-sm btn-outline-success flex-grow-1"
                                                 @onclick="() => EditQuiz(quiz.QuizId)">
-                                            <i class="bi bi-pencil"></i>
+                                            <i class="bi bi-pencil"></i> Rediger
                                         </button>
-                                        <button class="btn btn-sm btn-outline-danger" 
+                                        <button class="btn btn-sm btn-outline-danger flex-grow-1"
                                                 @onclick="() => ShowDeleteConfirmation(quiz)">
-                                            <i class="bi bi-trash"></i>
+                                            <i class="bi bi-trash"></i> Slet
                                         </button>
                                     </div>
                                 </div>
@@ -292,12 +288,7 @@
     {
         Nav.NavigateTo($"/quiz/{quizId}/view");
     }
-    
-    private void TakeQuiz(Guid quizId)
-    {
-        Nav.NavigateTo($"/quiz/{quizId}/take");
-    }
-    
+
     private void EditQuiz(Guid quizId)
     {
         Nav.NavigateTo($"/quiz/{quizId}/edit");

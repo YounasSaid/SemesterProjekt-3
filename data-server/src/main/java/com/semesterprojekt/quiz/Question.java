@@ -22,10 +22,10 @@ public class Question
 
   @Id
   @UuidGenerator
-  @Column(columnDefinition = "citext", name = "id", nullable = false, updatable = false)
+  @Column( name = "id", nullable = false, updatable = false)
   private UUID id;
 
-  @Column(columnDefinition = "citext", name = "question_text", nullable = false)
+  @Column( name = "question_text", nullable = false)
   private String questionText;
 
   @Column(name = "question_order", nullable = false)

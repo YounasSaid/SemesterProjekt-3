@@ -20,10 +20,10 @@ public class QuestionOptionEntity
 
   @Id
   @UuidGenerator
-  @Column(columnDefinition = "citext", name = "id", nullable = false, updatable = false)
+  @Column( name = "id", nullable = false, updatable = false)
   private UUID id;
 
-  @Column(columnDefinition = "citext", name = "option_text", nullable = false)
+  @Column( name = "option_text", nullable = false)
   private String optionText;
 
   @Column(name = "option_order", nullable = false)
