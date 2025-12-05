@@ -4,6 +4,7 @@
 @inject IHttpClientFactory HttpClientFactory
 @inject NavigationManager Nav
 @inject SimpleAuthService AuthService
+@inject QuizGrpcClient QuizClient
 @inject IJSRuntime JSRuntime
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 
@@ -92,9 +93,16 @@
                             <div class="card-body text-center">
                                 <i class="bi bi-trophy-fill text-warning" style="font-size: 3rem;"></i>
                                 <h5 class="mt-3">All Time Score</h5>
-                                <p class="fs-1 fw-bold text-primary mb-0">---</p>
-                                <p class="text-muted small">Points samlet i alt</p>
-                                <span class="badge bg-secondary">Kommer snart</span>
+                                @if (_stats != null)
+                                {
+                                    <p class="fs-1 fw-bold text-primary mb-0">@_stats.TotalScore</p>
+                                    <p class="text-muted small">Points samlet i alt</p>
+                                }
+                                else
+                                {
+                                    <p class="fs-1 fw-bold text-muted mb-0">0</p>
+                                    <p class="text-muted small">Ingen quizzer taget endnu</p>
+                                }
                             </div>
                         </div>
                     </div>
@@ -105,9 +113,16 @@
                             <div class="card-body text-center">
                                 <i class="bi bi-check-circle-fill text-success" style="font-size: 3rem;"></i>
                                 <h5 class="mt-3">Gennemførte Quizzer</h5>
-                                <p class="fs-1 fw-bold text-success mb-0">---</p>
-                                <p class="text-muted small">Quizzer du har taget</p>
-                                <span class="badge bg-secondary">Kommer snart</span>
+                                @if (_stats != null)
+                                {
+                                    <p class="fs-1 fw-bold text-success mb-0">@_stats.QuizzesTaken</p>
+                                    <p class="text-muted small">Quizzer du har taget</p>
+                                }
+                                else
+                                {
+                                    <p class="fs-1 fw-bold text-muted mb-0">0</p>
+                                    <p class="text-muted small">Ingen quizzer taget endnu</p>
+                                }
                             </div>
                         </div>
                     </div>
@@ -195,14 +210,15 @@
 
 @code {
     private UserProfileDto? _profile;
+    private UserStatsDto? _stats;
     private bool _loading = true;
     private string? _loadError;
     private string? _successMessage;
     private string? _errorMessage;
-    
+
     private bool _showPasswordForm = false;
     private bool _updatingPassword = false;
-    
+
     [SupplyParameterFromForm]
     private UpdatePasswordRequest _passwordRequest { get; set; } = new();
 
@@ -250,11 +266,22 @@
             if (response.IsSuccessStatusCode)
             {
                 _profile = await response.Content.ReadFromJsonAsync<UserProfileDto>();
-                
+
                 // Set email in password request
                 if (_profile != null)
                 {
                     _passwordRequest.Email = _profile.Email;
+
+                    // Load user stats
+                    try
+                    {
+                        _stats = await QuizClient.GetUserStatsAsync(_profile.UserId);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"⚠️ Failed to load stats: {ex.Message}");
+                        // Don't fail the entire page if stats fail to load
+                    }
                 }
             }
             else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
