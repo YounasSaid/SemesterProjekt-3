@@ -1,3 +1,4 @@
+@* Side til at redigere eksisterende quiz (titel, spørgsmål, svarmuligheder) *@
 @page "/quiz/{QuizId:guid}/edit"
 @using AppServer.Models
 @using AppServer.Services
@@ -27,11 +28,6 @@
                 <div class="alert alert-danger">
                     <i class="bi bi-exclamation-triangle-fill me-2"></i>
                     <strong>Fejl:</strong> @_loadError
-                </div>
-                <div class="text-center mt-3">
-                    <button class="btn btn-primary" @onclick="GoBack">
-                        <i class="bi bi-arrow-left"></i> Tilbage til Mine Quizzer
-                    </button>
                 </div>
             }
             else
@@ -231,7 +227,7 @@
             
             if (string.IsNullOrEmpty(userIdString))
             {
-                Console.WriteLine("❌ EditQuiz: No userId found in AuthService");
+                Console.WriteLine("EditQuiz: No userId found in AuthService");
                 _loadError = "Du skal være logget ind.";
                 Nav.NavigateTo("/login");
                 return;
@@ -239,25 +235,25 @@
 
             if (!Guid.TryParse(userIdString, out var userId))
             {
-                Console.WriteLine("❌ EditQuiz: Invalid userId format");
+                Console.WriteLine("EditQuiz: Invalid userId format");
                 _loadError = "Ugyldig bruger session.";
                 Nav.NavigateTo("/login");
                 return;
             }
 
-            Console.WriteLine($"✅ EditQuiz: Calling QuizClient.GetQuizAsync(quizId={QuizId}, userId={userId})");
+            Console.WriteLine($"EditQuiz: Calling QuizClient.GetQuizAsync(quizId={QuizId}, userId={userId})");
 
             // Call gRPC client to get quiz data
             var quiz = await QuizClient.GetQuizAsync(QuizId, userId);
 
             if (quiz == null)
             {
-                Console.WriteLine($"❌ EditQuiz: Quiz not found");
+                Console.WriteLine($"EditQuiz: Quiz not found");
                 _loadError = "Quiz blev ikke fundet.";
                 return;
             }
 
-            Console.WriteLine($"✅ EditQuiz: Successfully loaded quiz: {quiz.Title}");
+            Console.WriteLine($"EditQuiz: Successfully loaded quiz: {quiz.Title}");
 
             // Populate form with existing quiz data
             _title = quiz.Title;
@@ -276,18 +272,18 @@
                 }).ToList()
             }).ToList();
 
-            Console.WriteLine($"✅ EditQuiz: Populated {_questions.Count} questions");
+            Console.WriteLine($"EditQuiz: Populated {_questions.Count} questions");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"❌ EditQuiz: Exception: {ex.Message}");
+            Console.WriteLine($"EditQuiz: Exception: {ex.Message}");
             _loadError = $"Der opstod en fejl: {ex.Message}";
         }
         finally
         {
             _loading = false;
             StateHasChanged();
-            Console.WriteLine("🔍 EditQuiz: LoadQuiz() END");
+            Console.WriteLine("EditQuiz: LoadQuiz() END");
         }
     }
 
@@ -438,23 +434,51 @@
             return;
         }
 
-        // TODO: Submit UPDATE to API (not implemented yet - currently creates new quiz)
+        // Submit UPDATE to API
         _submitting = true;
         StateHasChanged();
 
         try
         {
-            await JSRuntime.InvokeVoidAsync("alert", 
-                "Redigering af quizzer er endnu ikke implementeret i backend.\n\n" +
-                "For at implementere dette skal der oprettes:\n" +
-                "- UpdateQuiz gRPC endpoint i data-server\n" +
-                "- PUT endpoint i QuizManagementController\n\n" +
-                "Dine ændringer er IKKE gemt.");
-            
-            Nav.NavigateTo("/myquizzes");
+            // Get userId from AuthService
+            var userIdString = AuthService.GetUserId();
+
+            if (string.IsNullOrEmpty(userIdString) || !Guid.TryParse(userIdString, out var userId))
+            {
+                _errors.Add("Du skal være logget ind for at redigere quizzer");
+                return;
+            }
+
+            // Map questions to DTOs
+            var questionDtos = _questions.Select(q => new CreateQuizQuestionDto
+            {
+                QuestionText = q.QuestionText,
+                QuestionOrder = q.QuestionOrder,
+                Points = q.Points,
+                Options = q.Options.Select(o => new CreateQuestionOptionDto
+                {
+                    OptionText = o.OptionText,
+                    IsCorrect = o.IsCorrect,
+                    OptionOrder = o.OptionOrder
+                }).ToList()
+            }).ToList();
+
+            // Call UpdateQuizAsync
+            var result = await QuizClient.UpdateQuizAsync(QuizId, userId, _title, questionDtos);
+
+            if (result == null)
+            {
+                _errors.Add("Der opstod en fejl ved opdatering af quiz. Prøv igen.");
+            }
+            else
+            {
+                Console.WriteLine($"Quiz updated successfully: {result.Title}");
+                Nav.NavigateTo("/myquizzes");
+            }
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"Error updating quiz: {ex.Message}");
             _errors.Add($"Der opstod en fejl: {ex.Message}");
         }
         finally
@@ -466,18 +490,13 @@
 
     private async Task HandleCancel()
     {
-        bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", 
+        bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm",
             "Er du sikker på at du vil annullere? Alle ændringer vil gå tabt.");
-        
+
         if (confirmed)
         {
             Nav.NavigateTo("/myquizzes");
         }
-    }
-
-    private void GoBack()
-    {
-        Nav.NavigateTo("/myquizzes");
     }
 
     // Model classes

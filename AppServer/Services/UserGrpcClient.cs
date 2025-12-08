@@ -1,8 +1,9 @@
-﻿using Grpc.Net.Client;
+using Grpc.Net.Client;
 using SemesterProjekt.Proto.User;
 
 namespace AppServer.Services;
 
+// gRPC klient til bruger-relaterede operationer
 public class UserGrpcClient : IDisposable
 {
     private readonly GrpcChannel _channel;
@@ -73,8 +74,81 @@ public class UserGrpcClient : IDisposable
         }
     }
 
+    // Henter bruger via user ID (til profilside)
+    public async Task<UserProfileDto?> GetUserByIdAsync(Guid userId)
+    {
+        try
+        {
+            var request = new GetUserByIdRequest { UserId = userId.ToString() };
+            var response = await _client.GetUserByIdAsync(request);
+
+            if (response.Found)
+            {
+                return new UserProfileDto
+                {
+                    UserId = Guid.Parse(response.UserId),
+                    Email = response.Email,
+                    FirstName = response.FirstName,
+                    LastName = response.LastName,
+                    Semester = response.Semester
+                };
+            }
+            return null;
+        }
+        catch (Grpc.Core.RpcException ex) when (ex.StatusCode == Grpc.Core.StatusCode.NotFound)
+        {
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"gRPC Error in GetUserById: {ex.Message}");
+            return null;
+        }
+    }
+
+    // Opdaterer brugerens password (AppServer skal verificere currentPassword FØRST)
+    public async Task<(bool success, string? errorCode)> UpdatePasswordAsync(
+        Guid userId, 
+        string newPasswordHash)
+    {
+        try
+        {
+            var request = new UpdatePasswordRequest
+            {
+                UserId = userId.ToString(),
+                NewPasswordHash = newPasswordHash
+            };
+
+            var response = await _client.UpdatePasswordAsync(request);
+            
+            if (response.Success)
+            {
+                return (true, null);
+            }
+            else
+            {
+                return (false, response.ErrorCode);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"gRPC Error in UpdatePassword: {ex.Message}");
+            return (false, "INTERNAL_ERROR");
+        }
+    }
+
     public void Dispose()
     {
         _channel?.Dispose();
     }
+}
+
+// DTO til brugerprofil
+public class UserProfileDto
+{
+    public Guid UserId { get; set; }
+    public string Email { get; set; } = string.Empty;
+    public string FirstName { get; set; } = string.Empty;
+    public string LastName { get; set; } = string.Empty;
+    public int Semester { get; set; }
 }

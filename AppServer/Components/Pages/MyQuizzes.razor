@@ -1,0 +1,304 @@
+@* Side til at vise brugerens egne quizzer (opret, slet, rediger) *@
+@page "/myquizzes"
+@using AppServer.Models
+@using AppServer.Utils
+@using AppServer.Services
+@inject IHttpClientFactory HttpClientFactory
+@inject NavigationManager Nav
+@inject SimpleAuthService AuthService
+@inject IJSRuntime JSRuntime
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Mine Quizzer</PageTitle>
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-10 mx-auto">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>Mine Quizzer</h2>
+                <a href="/quiz/create" class="btn btn-primary">Opret Ny Quiz</a>
+            </div>
+
+            @if (_loading)
+            {
+                <p>Loading...</p>
+            }
+
+            @if (_error != null)
+            {
+                <div class="alert alert-danger">
+                    <strong>Fejl:</strong> @_error
+                </div>
+                <button class="btn btn-primary" @onclick="LoadQuizzes">Prøv igen</button>
+            }
+
+            @if (_successMessage != null)
+            {
+                <div class="alert alert-success">
+                    @_successMessage
+                </div>
+            }
+
+            @if (!_loading && _error == null && !_myQuizzes.Any())
+            {
+                <p>Ingen quizzer fundet.</p>
+            }
+
+            @if (!_loading && _error == null && _myQuizzes.Any())
+            {
+                <p>Viser @_myQuizzes.Count quiz@(_myQuizzes.Count != 1 ? "zer" : "")</p>
+
+                <div class="row g-3">
+                    @foreach (var quiz in _myQuizzes)
+                    {
+                        <div class="col-md-6 col-lg-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">@quiz.Title</h5>
+
+                                    <p>@quiz.QuestionCount spørgsmål</p>
+                                    <p>@quiz.TotalPoints point</p>
+                                    <p class="text-muted small">Oprettet: @quiz.CreatedAt.ToString("dd/MM/yyyy HH:mm")</p>
+
+                                    <div class="d-flex gap-2 flex-wrap">
+                                        <button class="btn btn-sm btn-secondary"
+                                                @onclick="() => ViewQuiz(quiz.QuizId)">
+                                            Se
+                                        </button>
+                                        <button class="btn btn-sm btn-primary"
+                                                @onclick="() => EditQuiz(quiz.QuizId)">
+                                            Rediger
+                                        </button>
+                                        <button class="btn btn-sm btn-danger"
+                                                @onclick="() => ShowDeleteConfirmation(quiz)">
+                                            Slet
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@if (_showDeleteDialog && _deleteConfirmQuiz != null)
+{
+    <div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Bekræft Sletning</h5>
+                    <button type="button" class="btn-close" @onclick="CancelDelete"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Er du sikker på du vil slette denne quiz?</p>
+                    <p><strong>Quiz:</strong> @_deleteConfirmQuiz.Title</p>
+                    <p><strong>Spørgsmål:</strong> @_deleteConfirmQuiz.QuestionCount</p>
+                    <p><strong>Total Points:</strong> @_deleteConfirmQuiz.TotalPoints</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-secondary"
+                            @onclick="CancelDelete"
+                            disabled="@_deleting">
+                        Annuller
+                    </button>
+                    <button type="button"
+                            class="btn btn-danger"
+                            @onclick="ConfirmDelete"
+                            disabled="@_deleting">
+                        @if (_deleting)
+                        {
+                            <span>Sletter...</span>
+                        }
+                        else
+                        {
+                            <span>Ja, Slet Quiz</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<QuizSummaryDto> _myQuizzes = new();
+    private bool _loading = true;
+    private string? _error;
+    private string? _successMessage;
+    private bool _showDeleteDialog = false;
+    private QuizSummaryDto? _deleteConfirmQuiz;
+    private bool _deleting = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine("MYQUIZZES: OnInitializedAsync START");
+
+        string? userIdString = null;
+
+        try
+        {
+            userIdString = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userId");
+            Console.WriteLine($"MYQUIZZES: LocalStorage UserId={userIdString ?? "NULL"}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"MYQUIZZES: LocalStorage error: {ex.Message}");
+        }
+
+        if (string.IsNullOrEmpty(userIdString))
+        {
+            userIdString = AuthService.GetUserId();
+            Console.WriteLine($"MYQUIZZES: AuthService UserId={userIdString ?? "NULL"}");
+        }
+
+        if (string.IsNullOrEmpty(userIdString))
+        {
+            Console.WriteLine("MYQUIZZES: No userId - redirecting to login");
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        await LoadQuizzes();
+    }
+
+    private async Task LoadQuizzes()
+    {
+        _loading = true;
+        _error = null;
+        _successMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var httpClient = HttpClientFactory.CreateClient();
+            httpClient.BaseAddress = new Uri(Nav.BaseUri);
+
+            var response = await httpClient.GetAsync("/api/quizmanagement/myquizzes");
+
+            if (response.IsSuccessStatusCode)
+            {
+                _myQuizzes = await response.Content.ReadFromJsonAsync<List<QuizSummaryDto>>() ?? new();
+                _myQuizzes = _myQuizzes.OrderByDescending(q => q.CreatedAt).ToList();
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                Nav.NavigateTo("/login");
+                return;
+            }
+            else
+            {
+                _error = "Kunne ikke indlæse dine quizzer. Prøv igen senere.";
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            _error = $"Netværksfejl: Kunne ikke oprette forbindelse til serveren.";
+        }
+        catch (Exception ex)
+        {
+            _error = $"Der opstod en uventet fejl ved indlæsning af quizzer.";
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ViewQuiz(Guid quizId)
+    {
+        Nav.NavigateTo($"/quiz/{quizId}/view");
+    }
+
+    private void EditQuiz(Guid quizId)
+    {
+        Nav.NavigateTo($"/quiz/{quizId}/edit");
+    }
+
+    private void ShowDeleteConfirmation(QuizSummaryDto quiz)
+    {
+        _deleteConfirmQuiz = quiz;
+        _showDeleteDialog = true;
+        StateHasChanged();
+    }
+
+    private void CancelDelete()
+    {
+        _showDeleteDialog = false;
+        _deleteConfirmQuiz = null;
+        StateHasChanged();
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (_deleteConfirmQuiz == null)
+            return;
+
+        _deleting = true;
+        StateHasChanged();
+
+        try
+        {
+            var httpClient = HttpClientFactory.CreateClient();
+            httpClient.BaseAddress = new Uri(Nav.BaseUri);
+
+            var response = await httpClient.DeleteAsync($"/api/quizmanagement/{_deleteConfirmQuiz.QuizId}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                _successMessage = $"Quiz '{_deleteConfirmQuiz.Title}' blev slettet succesfuldt.";
+                _showDeleteDialog = false;
+                _deleteConfirmQuiz = null;
+                await LoadQuizzes();
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                _error = "Du har ikke tilladelse til at slette denne quiz.";
+                _showDeleteDialog = false;
+                _deleteConfirmQuiz = null;
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _error = "Quiz blev ikke fundet. Den kan være blevet slettet allerede.";
+                _showDeleteDialog = false;
+                _deleteConfirmQuiz = null;
+                await LoadQuizzes();
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _error = "Kunne ikke slette quiz. Prøv igen senere.";
+                _showDeleteDialog = false;
+                _deleteConfirmQuiz = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Der opstod en fejl ved sletning af quiz.";
+            _showDeleteDialog = false;
+            _deleteConfirmQuiz = null;
+        }
+        finally
+        {
+            _deleting = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ClearError()
+    {
+        _error = null;
+        StateHasChanged();
+    }
+
+    private void ClearSuccess()
+    {
+        _successMessage = null;
+        StateHasChanged();
+    }
+}

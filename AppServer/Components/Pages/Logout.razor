@@ -1,0 +1,54 @@
+@page "/logout"
+@using AppServer.Services
+@inject NavigationManager Nav
+@inject SimpleAuthService AuthService
+@inject HttpClient HttpClient
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Logger ud...</PageTitle>
+
+<div class="container mt-5">
+    <div class="text-center">
+        <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+            <span class="visually-hidden">Logger ud...</span>
+        </div>
+        <p class="mt-3 text-muted">Logger ud...</p>
+    </div>
+</div>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        await LogoutUser();
+    }
+
+    private async Task LogoutUser()
+    {
+        try
+        {
+            // Call logout API
+            var baseUrl = Nav.BaseUri.TrimEnd('/');
+            await HttpClient.PostAsync($"{baseUrl}/api/auth/logout", null);
+        }
+        catch
+        {
+            // Continue with logout even if API call fails
+        }
+
+        try
+        {
+            // Clear localStorage
+            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "userId");
+        }
+        catch
+        {
+            // Continue even if localStorage clear fails
+        }
+
+        // Clear auth service
+        AuthService.ClearUserId();
+
+        // Redirect to login page
+        Nav.NavigateTo("/login", true);
+    }
+}

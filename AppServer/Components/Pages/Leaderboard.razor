@@ -1,0 +1,169 @@
+@* Side til at vise leaderboard (rangliste med top brugere efter score) *@
+@page "/leaderboard"
+@using AppServer.Services
+@using AppServer.Models
+@inject QuizGrpcClient QuizClient
+@inject SimpleAuthService AuthService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Nav
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Leaderboard</PageTitle>
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-10 mx-auto">
+            <h2>Leaderboard</h2>
+
+            @if (_loading)
+            {
+                <p>Loading...</p>
+            }
+            else if (_error != null)
+            {
+                <div class="alert alert-danger">
+                    <strong>Fejl:</strong> @_error
+                </div>
+            }
+            else if (_leaderboard != null && _leaderboard.Any())
+            {
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Top Spillere</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th class="text-center">Plads</th>
+                                        <th>Navn</th>
+                                        <th class="text-center">Total Score</th>
+                                        <th class="text-center">Quizzer Taget</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var entry in _leaderboard)
+                                    {
+                                        var isCurrentUser = _currentUserId != null && entry.UserId == _currentUserId;
+                                        var rowClass = isCurrentUser ? "table-info" : "";
+
+                                        <tr class="@rowClass">
+                                            <td class="text-center">
+                                                @entry.Rank
+                                            </td>
+                                            <td>
+                                                <strong>@entry.FullName</strong>
+                                                @if (isCurrentUser)
+                                                {
+                                                    <span class="badge bg-success ms-2">Dig</span>
+                                                }
+                                            </td>
+                                            <td class="text-center">
+                                                <strong>@entry.TotalScore</strong>
+                                            </td>
+                                            <td class="text-center">
+                                                @entry.QuizzesTaken
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                @if (_currentUserEntry != null && !_leaderboard.Any(e => e.UserId == _currentUserId))
+                {
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h6>Din Placering</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-center">
+                                <div class="col-md-4">
+                                    <p>Plads</p>
+                                    <h4>@_currentUserEntry.Rank</h4>
+                                </div>
+                                <div class="col-md-4">
+                                    <p>Total Score</p>
+                                    <h4>@_currentUserEntry.TotalScore</h4>
+                                </div>
+                                <div class="col-md-4">
+                                    <p>Quizzer Taget</p>
+                                    <h4>@_currentUserEntry.QuizzesTaken</h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="alert alert-info">
+                    Ingen data tilgængelig endnu. Tag nogle quizzer for at komme på leaderboardet!
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<LeaderboardEntryDto>? _leaderboard;
+    private LeaderboardEntryDto? _currentUserEntry;
+    private Guid? _currentUserId;
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        string? userIdString = null;
+
+        try
+        {
+            userIdString = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userId");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Leaderboard: LocalStorage error: {ex.Message}");
+        }
+
+        if (string.IsNullOrEmpty(userIdString))
+        {
+            userIdString = AuthService.GetUserId();
+        }
+
+        if (!string.IsNullOrEmpty(userIdString) && Guid.TryParse(userIdString, out var userId))
+        {
+            _currentUserId = userId;
+        }
+
+        await LoadLeaderboard();
+    }
+
+    private async Task LoadLeaderboard()
+    {
+        _loading = true;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            _leaderboard = await QuizClient.GetLeaderboardAsync(50);
+
+            if (_currentUserId.HasValue && _leaderboard != null)
+            {
+                _currentUserEntry = _leaderboard.FirstOrDefault(e => e.UserId == _currentUserId.Value);
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Der opstod en fejl: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+}

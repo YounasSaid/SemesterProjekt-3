@@ -1,3 +1,4 @@
+@* Side til brugerregistrering (fornavn, efternavn, email, password) *@
 @page "/register"
 @using AppServer.Models
 @inject AppServer.Services.AuthUiService Auth
@@ -14,17 +15,6 @@
     <div class="mb-2"><label>Efternavn</label><br /><InputText class="form-control" @bind-Value="model.LastName" /></div>
     <div class="mb-2"><label>Skolemail</label><br /><InputText class="form-control" @bind-Value="model.SchoolEmail" /></div>
     <div class="mb-2"><label>Password</label><br /><InputText class="form-control" type="password" @bind-Value="model.Password" />
-    </div>
-
-    <div class="mb-2">
-        <label>Semester</label><br />
-        <InputSelect class="form-select" @bind-Value="model.Semester">
-            @for (int i = 1; i <= 7; i++)
-            {
-                <option value="@i" disabled="@(i != 3)">@i</option>
-            }
-        </InputSelect>
-        <small>(Kun 3 er tilladt i POC)</small>
     </div>
 
     @if (!string.IsNullOrEmpty(msg)) { <p class="text-success">@msg</p> }
@@ -54,9 +44,8 @@
         {
             error = code switch
             {
-                "INVALID_Semester" => "Kun semester 3 er tilladt i denne POC.",
-                "EMAIL_TAKEN"      => "Mailen er allerede brugt.",
-                _                  => "Noget gik galt."
+                "EMAIL_TAKEN" => "Mailen er allerede brugt.",
+                _             => "Noget gik galt."
             };
         }
     }

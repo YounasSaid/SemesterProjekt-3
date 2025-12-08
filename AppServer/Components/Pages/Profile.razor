@@ -1,0 +1,334 @@
+@* Side til at vise brugerprofil (navn, email, stats, adgangskode-skift) *@
+@page "/profile"
+@using AppServer.Services
+@using AppServer.Models
+@inject IHttpClientFactory HttpClientFactory
+@inject NavigationManager Nav
+@inject SimpleAuthService AuthService
+@inject QuizGrpcClient QuizClient
+@inject IJSRuntime JSRuntime
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Min Profil</PageTitle>
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-10 mx-auto">
+            <h2>Min Profil</h2>
+
+            @if (_loading)
+            {
+                <p>Loading...</p>
+            }
+            else if (_loadError != null)
+            {
+                <div class="alert alert-danger">
+                    <strong>Fejl:</strong> @_loadError
+                </div>
+            }
+            else if (_profile != null)
+            {
+                @if (_successMessage != null)
+                {
+                    <div class="alert alert-success">
+                        @_successMessage
+                    </div>
+                }
+                @if (_errorMessage != null)
+                {
+                    <div class="alert alert-danger">
+                        @_errorMessage
+                    </div>
+                }
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5>Brugeroplysninger</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label>Fornavn</label>
+                                <p>@_profile.FirstName</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label>Efternavn</label>
+                                <p>@_profile.LastName</p>
+                            </div>
+                            <div class="col-md-12 mb-3">
+                                <label>Email</label>
+                                <p>@_profile.Email</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-md-6 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5>Total Score</h5>
+                                @if (_stats != null)
+                                {
+                                    <p class="fs-3">@_stats.TotalScore</p>
+                                }
+                                else
+                                {
+                                    <p class="fs-3">0</p>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5>Gennemførte Quizzer</h5>
+                                @if (_stats != null)
+                                {
+                                    <p class="fs-3">@_stats.QuizzesTaken</p>
+                                }
+                                else
+                                {
+                                    <p class="fs-3">0</p>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Skift Adgangskode</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (_showPasswordForm)
+                        {
+                            <EditForm Model="_passwordRequest" OnValidSubmit="HandlePasswordUpdate" FormName="PasswordUpdateForm">
+                                <DataAnnotationsValidator />
+
+                                <div class="mb-3">
+                                    <label class="form-label">Nuværende Adgangskode</label>
+                                    <InputText type="password"
+                                               class="form-control"
+                                               @bind-Value="_passwordRequest.CurrentPassword"
+                                               placeholder="Indtast nuværende adgangskode" />
+                                    <ValidationMessage For="@(() => _passwordRequest.CurrentPassword)" />
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Ny Adgangskode</label>
+                                    <InputText type="password"
+                                               class="form-control"
+                                               @bind-Value="_passwordRequest.NewPassword"
+                                               placeholder="Minimum 8 tegn" />
+                                    <ValidationMessage For="@(() => _passwordRequest.NewPassword)" />
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Bekræft Ny Adgangskode</label>
+                                    <InputText type="password"
+                                               class="form-control"
+                                               @bind-Value="_passwordRequest.ConfirmNewPassword"
+                                               placeholder="Indtast ny adgangskode igen" />
+                                    <ValidationMessage For="@(() => _passwordRequest.ConfirmNewPassword)" />
+                                </div>
+
+                                <div class="d-flex gap-2">
+                                    <button type="submit"
+                                            class="btn btn-primary"
+                                            disabled="@_updatingPassword">
+                                        @if (_updatingPassword)
+                                        {
+                                            <span>Opdaterer...</span>
+                                        }
+                                        else
+                                        {
+                                            <span>Opdater Adgangskode</span>
+                                        }
+                                    </button>
+                                    <button type="button"
+                                            class="btn btn-secondary"
+                                            @onclick="CancelPasswordUpdate"
+                                            disabled="@_updatingPassword">
+                                        Annuller
+                                    </button>
+                                </div>
+                            </EditForm>
+                        }
+                        else
+                        {
+                            <p class="text-muted mb-3">Klik på knappen nedenfor for at ændre din adgangskode.</p>
+                            <button class="btn btn-primary" @onclick="ShowPasswordForm">
+                                Skift Adgangskode
+                            </button>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private UserProfileDto? _profile;
+    private UserStatsDto? _stats;
+    private bool _loading = true;
+    private string? _loadError;
+    private string? _successMessage;
+    private string? _errorMessage;
+
+    private bool _showPasswordForm = false;
+    private bool _updatingPassword = false;
+
+    [SupplyParameterFromForm]
+    private UpdatePasswordRequest _passwordRequest { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        string? userIdString = null;
+
+        try
+        {
+            userIdString = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userId");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Profile: LocalStorage error: {ex.Message}");
+        }
+
+        if (string.IsNullOrEmpty(userIdString))
+        {
+            userIdString = AuthService.GetUserId();
+        }
+
+        if (string.IsNullOrEmpty(userIdString))
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        await LoadProfile();
+    }
+
+    private async Task LoadProfile()
+    {
+        _loading = true;
+        _loadError = null;
+        StateHasChanged();
+
+        try
+        {
+            var httpClient = HttpClientFactory.CreateClient();
+            httpClient.BaseAddress = new Uri(Nav.BaseUri);
+
+            var response = await httpClient.GetAsync("/api/profile");
+
+            if (response.IsSuccessStatusCode)
+            {
+                _profile = await response.Content.ReadFromJsonAsync<UserProfileDto>();
+
+                if (_profile != null)
+                {
+                    _passwordRequest.Email = _profile.Email;
+
+                    try
+                    {
+                        _stats = await QuizClient.GetUserStatsAsync(_profile.UserId);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Failed to load stats: {ex.Message}");
+                    }
+                }
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                Nav.NavigateTo("/login");
+                return;
+            }
+            else
+            {
+                _loadError = "Kunne ikke indlæse profildata.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _loadError = $"Der opstod en fejl: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ShowPasswordForm()
+    {
+        _showPasswordForm = true;
+        _errorMessage = null;
+        _successMessage = null;
+
+        _passwordRequest = new UpdatePasswordRequest
+        {
+            Email = _profile?.Email ?? ""
+        };
+    }
+
+    private void CancelPasswordUpdate()
+    {
+        _showPasswordForm = false;
+        _passwordRequest = new UpdatePasswordRequest
+        {
+            Email = _profile?.Email ?? ""
+        };
+    }
+
+    private async Task HandlePasswordUpdate()
+    {
+        _updatingPassword = true;
+        _errorMessage = null;
+        _successMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var httpClient = HttpClientFactory.CreateClient();
+            httpClient.BaseAddress = new Uri(Nav.BaseUri);
+
+            var response = await httpClient.PutAsJsonAsync("/api/profile/password", _passwordRequest);
+
+            if (response.IsSuccessStatusCode)
+            {
+                _successMessage = "Adgangskode blev opdateret succesfuldt!";
+                _showPasswordForm = false;
+
+                _passwordRequest = new UpdatePasswordRequest
+                {
+                    Email = _profile?.Email ?? ""
+                };
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+
+                if (errorContent.Contains("WRONG_PASSWORD"))
+                {
+                    _errorMessage = "Nuværende adgangskode er forkert.";
+                }
+                else
+                {
+                    _errorMessage = "Kunne ikke opdatere adgangskode. Prøv igen.";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Der opstod en fejl: {ex.Message}";
+        }
+        finally
+        {
+            _updatingPassword = false;
+            StateHasChanged();
+        }
+    }
+}

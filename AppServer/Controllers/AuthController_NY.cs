@@ -6,6 +6,7 @@ using SemesterProjekt.Proto.User;
 
 namespace AppServer.Controllers;
 
+// REST API controller til autentificering (register, login, logout)
 [ApiController]
 [Route("api/[controller]")]
 public class AuthController : ControllerBase

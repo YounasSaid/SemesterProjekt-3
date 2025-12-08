@@ -1,3 +1,4 @@
+@* Side til bruger login (email og password) *@
 @page "/login"
 @using AppServer.Models
 @using AppServer.Services
@@ -64,18 +65,18 @@
             
             if (ok)
             {
-                Console.WriteLine($"✅ LOGIN: userId={userId}");
+                Console.WriteLine($"LOGIN: userId={userId}");
                 
                 // Store userId in AuthService (SIMPLE - no Circuit ID needed!)
                 AuthService.SetUserId(userId);
-                Console.WriteLine("✅ LOGIN: UserId stored in AuthService");
+                Console.WriteLine("LOGIN: UserId stored in AuthService");
                 
                 // ALSO store in browser LocalStorage for persistence across reloads
                 await JS.InvokeVoidAsync("localStorage.setItem", "userId", userId);
-                Console.WriteLine("✅ LOGIN: UserId stored in LocalStorage");
+                Console.WriteLine("LOGIN: UserId stored in LocalStorage");
                 
                 // Navigate to myquizzes
-                Console.WriteLine("✅ LOGIN: Navigating to /myquizzes");
+                Console.WriteLine("LOGIN: Navigating to /myquizzes");
                 Nav.NavigateTo("/myquizzes");
             }
             else
@@ -89,7 +90,7 @@
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"❌ LOGIN exception: {ex.Message}");
+            Console.WriteLine($"LOGIN exception: {ex.Message}");
             error = "Der opstod en fejl. Prøv igen.";
             submitting = false;
             StateHasChanged();

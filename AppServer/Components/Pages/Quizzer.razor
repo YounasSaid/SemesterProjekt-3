@@ -1,0 +1,162 @@
+@* Side til at vise tilgængelige quizzer fra andre brugere (spil quizzer) *@
+@page "/quizzer"
+@using AppServer.Models
+@using AppServer.Utils
+@using AppServer.Services
+@inject IHttpClientFactory HttpClientFactory
+@inject NavigationManager Nav
+@inject SimpleAuthService AuthService
+@inject IJSRuntime JSRuntime
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Spil Quizzer</PageTitle>
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-10 mx-auto">
+            <h2>Spil Quizzer</h2>
+            <p>Find og spil quizzer lavet af andre brugere</p>
+
+            @if (_loading)
+            {
+                <p>Loading...</p>
+            }
+
+            @if (_error != null)
+            {
+                <div class="alert alert-danger">
+                    <strong>Fejl:</strong> @_error
+                </div>
+                <button class="btn btn-primary" @onclick="LoadQuizzes">Prøv igen</button>
+            }
+
+            @if (!_loading && _error == null && !_availableQuizzes.Any())
+            {
+                <p>Ingen tilgængelige quizzer</p>
+            }
+
+            @if (!_loading && _error == null && _availableQuizzes.Any())
+            {
+                <p>Viser @_availableQuizzes.Count quiz@(_availableQuizzes.Count != 1 ? "zer" : "") at spille</p>
+
+                <div class="row g-3">
+                    @foreach (var quiz in _availableQuizzes)
+                    {
+                        <div class="col-md-6 col-lg-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">@quiz.Title</h5>
+
+                                    <p>@quiz.QuestionCount spørgsmål</p>
+                                    <p>@quiz.TotalPoints point</p>
+                                    <p class="text-muted small">Oprettet: @quiz.CreatedAt.ToString("dd/MM/yyyy HH:mm")</p>
+
+                                    <button class="btn btn-primary w-100"
+                                            @onclick="() => PlayQuiz(quiz.QuizId)">
+                                        Spil Quiz
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<QuizSummaryDto> _availableQuizzes = new();
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine("QUIZZER: OnInitializedAsync START");
+
+        string? userIdString = null;
+
+        try
+        {
+            userIdString = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userId");
+            Console.WriteLine($"QUIZZER: LocalStorage UserId={userIdString ?? "NULL"}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"QUIZZER: LocalStorage error: {ex.Message}");
+        }
+
+        if (string.IsNullOrEmpty(userIdString))
+        {
+            userIdString = AuthService.GetUserId();
+            Console.WriteLine($"QUIZZER: AuthService UserId={userIdString ?? "NULL"}");
+        }
+
+        if (string.IsNullOrEmpty(userIdString))
+        {
+            Console.WriteLine("QUIZZER: No userId - redirecting to login");
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        await LoadQuizzes();
+    }
+
+    private async Task LoadQuizzes()
+    {
+        _loading = true;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            var httpClient = HttpClientFactory.CreateClient();
+            httpClient.BaseAddress = new Uri(Nav.BaseUri);
+
+            var response = await httpClient.GetAsync("/api/quizmanagement/available");
+
+            if (response.IsSuccessStatusCode)
+            {
+                _availableQuizzes = await response.Content.ReadFromJsonAsync<List<QuizSummaryDto>>() ?? new();
+                _availableQuizzes = _availableQuizzes.OrderByDescending(q => q.CreatedAt).ToList();
+
+                Console.WriteLine($"QUIZZER: Loaded {_availableQuizzes.Count} available quizzes");
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                Nav.NavigateTo("/login");
+                return;
+            }
+            else
+            {
+                _error = "Kunne ikke indlæse tilgængelige quizzer. Prøv igen senere.";
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            _error = $"Netværksfejl: Kunne ikke oprette forbindelse til serveren.";
+            Console.WriteLine($"QUIZZER: HttpRequestException: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            _error = $"Der opstod en uventet fejl ved indlæsning af quizzer.";
+            Console.WriteLine($"QUIZZER: Exception: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void PlayQuiz(Guid quizId)
+    {
+        Nav.NavigateTo($"/quiz/{quizId}/take");
+    }
+
+    private void ClearError()
+    {
+        _error = null;
+        StateHasChanged();
+    }
+}

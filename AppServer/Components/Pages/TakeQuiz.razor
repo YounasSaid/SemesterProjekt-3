@@ -1,0 +1,535 @@
+@* Side til at tage/gennemføre en quiz og få resultater *@
+@page "/quiz/{QuizId:guid}/take"
+@using AppServer.Models
+@using AppServer.Services
+@using System.Diagnostics
+@inject NavigationManager Nav
+@inject SimpleAuthService AuthService
+@inject QuizGrpcClient QuizClient
+@inject IJSRuntime JSRuntime
+@inject IHttpClientFactory HttpClientFactory
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>@(_quiz?.Title ?? "Tag Quiz")</PageTitle>
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-10 mx-auto">
+            @if (_loading)
+            {
+                <p>Loading...</p>
+            }
+            else if (_error != null)
+            {
+                <div class="alert alert-danger">
+                    <strong>Fejl:</strong> @_error
+                </div>
+            }
+            else if (!_quizStarted && _quiz != null)
+            {
+                <div class="card">
+                    <div class="card-body text-center py-5">
+                        <h2>@_quiz.Title</h2>
+                        <hr class="my-4" />
+
+                        <div class="row justify-content-center mb-4">
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5>@_quiz.Questions.Count</h5>
+                                        <p>Spørgsmål</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5>@_quiz.TotalPoints</h5>
+                                        <p>Total Points</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5>Ingen</h5>
+                                        <p>Tidsbegrænsning</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <p class="text-muted mb-4">
+                            Hvert spørgsmål har kun ét korrekt svar.<br/>
+                            Du skal besvare alle spørgsmål for at afslutte quizzen.
+                        </p>
+
+                        <button class="btn btn-primary btn-lg" @onclick="StartQuiz">
+                            Start Quiz
+                        </button>
+                    </div>
+                </div>
+            }
+            @* Quiz In Progress *@
+            else if (_quizStarted && !_quizSubmitted && _quiz != null)
+            {
+                <div class="sticky-top bg-white py-3 mb-3 border-bottom">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0">@_quiz.Title</h4>
+                            <small class="text-muted">
+                                @_answeredCount / @_quiz.Questions.Count besvaret
+                            </small>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-info">@FormatElapsedTime()</span>
+                        </div>
+                    </div>
+                </div>
+
+                @* Questions List *@
+                @foreach (var question in _quiz.Questions.OrderBy(q => q.QuestionOrder))
+                {
+                    var qIndex = question.QuestionOrder;
+                    var isAnswered = _selectedAnswers.ContainsKey(question.QuestionId);
+                    var hasValidationError = _unansweredQuestions.Contains(question.QuestionId);
+                    
+                    <div class="card mb-3 @(hasValidationError ? "border-danger" : "")" id="question-@question.QuestionId">
+                        <div class="card-header @(isAnswered ? "bg-success text-white" : (hasValidationError ? "bg-danger text-white" : "bg-light"))">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span>
+                                    <strong>Spørgsmål @qIndex</strong>
+                                    @if (hasValidationError)
+                                    {
+                                        <span class="ms-2">Mangler svar</span>
+                                    }
+                                </span>
+                                <span class="badge @(isAnswered ? "bg-light text-success" : "bg-secondary")">
+                                    @question.Points point
+                                </span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <p class="fs-5 mb-3">@question.QuestionText</p>
+                            
+                            <div class="list-group">
+                                @foreach (var option in question.Options.OrderBy(o => o.OptionOrder))
+                                {
+                                    var isSelected = _selectedAnswers.TryGetValue(question.QuestionId, out var selectedId) 
+                                                     && selectedId == option.OptionId;
+                                    
+                                    <label class="list-group-item list-group-item-action d-flex align-items-center @(isSelected ? "active" : "")"
+                                           style="cursor: pointer;">
+                                        <input type="radio" 
+                                               class="form-check-input me-3" 
+                                               name="question-@question.QuestionId"
+                                               checked="@isSelected"
+                                               @onchange="() => SelectAnswer(question.QuestionId, option.OptionId)" />
+                                        <span>@option.OptionText</span>
+                                    </label>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                @if (_validationError != null)
+                {
+                    <div class="alert alert-danger">
+                        @_validationError
+                        <button type="button" class="btn-close" @onclick="ClearValidationError"></button>
+                    </div>
+                }
+
+                <div class="card mt-4 mb-5">
+                    <div class="card-body text-center">
+                        <p class="mb-3">
+                            Du har besvaret <strong>@_answeredCount</strong> ud af <strong>@_quiz.Questions.Count</strong> spørgsmål.
+                        </p>
+                        <button class="btn btn-success btn-lg"
+                                @onclick="SubmitQuiz"
+                                disabled="@_submitting">
+                            @if (_submitting)
+                            {
+                                <span>Indsender...</span>
+                            }
+                            else
+                            {
+                                <span>Afslut og se resultat</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            }
+            else if (_quizSubmitted && _result != null)
+            {
+                <div class="card mb-4">
+                    <div class="card-body text-center py-5">
+                        @{
+                            var scoreClass = _result.Percentage >= 80 ? "text-success" :
+                                            (_result.Percentage >= 50 ? "text-warning" : "text-danger");
+                        }
+
+                        <h2>Quiz Fuldført!</h2>
+
+                        <div class="display-4 @scoreClass my-3">
+                            @_result.Score / @_result.TotalPoints
+                        </div>
+
+                        <div class="row justify-content-center mt-4">
+                            <div class="col-md-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5>@_result.CorrectCount</h5>
+                                        <p>Korrekte</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5>@(_result.TotalCount - _result.CorrectCount)</h5>
+                                        <p>Forkerte</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5>@FormatDuration()</h5>
+                                        <p>Tid brugt</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h4 class="mb-3">Gennemgang af svar</h4>
+
+                @foreach (var question in _quiz!.Questions.OrderBy(q => q.QuestionOrder))
+                {
+                    var answerResult = _result.Results.FirstOrDefault(r => r.QuestionId == question.QuestionId);
+                    var isCorrect = answerResult?.IsCorrect ?? false;
+                    var selectedOptionId = _selectedAnswers.GetValueOrDefault(question.QuestionId);
+
+                    <div class="card mb-3 @(isCorrect ? "border-success" : "border-danger")">
+                        <div class="card-header @(isCorrect ? "bg-success" : "bg-danger") text-white">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span>
+                                    Spørgsmål @question.QuestionOrder
+                                </span>
+                                <span class="badge bg-light @(isCorrect ? "text-success" : "text-danger")">
+                                    @(answerResult?.PointsEarned ?? 0) / @question.Points point
+                                </span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <p class="fs-5 mb-3">@question.QuestionText</p>
+                            
+                            <div class="list-group">
+                                @foreach (var option in question.Options.OrderBy(o => o.OptionOrder))
+                                {
+                                    var wasSelected = option.OptionId == selectedOptionId;
+                                    var isCorrectOption = option.IsCorrect;
+                                    
+                                    var itemClass = "";
+                                    if (isCorrectOption)
+                                    {
+                                        itemClass = "list-group-item-success";
+                                    }
+                                    else if (wasSelected && !isCorrectOption)
+                                    {
+                                        itemClass = "list-group-item-danger";
+                                    }
+                                    
+                                    <div class="list-group-item @itemClass d-flex justify-content-between align-items-center">
+                                        <span>
+                                            @if (wasSelected)
+                                            {
+                                                <i class="bi bi-arrow-right-circle-fill me-2"></i>
+                                            }
+                                            @option.OptionText
+                                        </span>
+                                        @if (isCorrectOption)
+                                        {
+                                            <span class="badge bg-success">
+                                                <i class="bi bi-check"></i> Korrekt svar
+                                            </span>
+                                        }
+                                        else if (wasSelected)
+                                        {
+                                            <span class="badge bg-danger">
+                                                <i class="bi bi-x"></i> Dit svar
+                                            </span>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                @* Action Buttons *@
+                <div class="text-center mt-4 mb-5">
+                    <button class="btn btn-primary btn-lg me-2" @onclick="RetakeQuiz">
+                        <i class="bi bi-arrow-repeat me-2"></i>
+                        Tag quizzen igen
+                    </button>
+                    <a href="/quizzer" class="btn btn-outline-secondary btn-lg">
+                        <i class="bi bi-arrow-left me-2"></i>
+                        Tilbage til Quizzer
+                    </a>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public Guid QuizId { get; set; }
+
+    // State
+    private QuizDetailsDto? _quiz;
+    private bool _loading = true;
+    private string? _error;
+    private bool _quizStarted = false;
+    private bool _quizSubmitted = false;
+    private bool _submitting = false;
+    private string? _validationError;
+    
+    // Timer
+    private DateTime _startTime;
+    private DateTime _endTime;
+    private System.Threading.Timer? _timer;
+    private TimeSpan _elapsedTime = TimeSpan.Zero;
+    
+    // Answers
+    private Dictionary<Guid, Guid> _selectedAnswers = new();
+    private HashSet<Guid> _unansweredQuestions = new();
+    
+    // Result
+    private QuizSubmissionResultDto? _result;
+
+    private int _answeredCount => _selectedAnswers.Count;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine($"🔍 TakeQuiz: OnInitializedAsync START - QuizId={QuizId}");
+        await LoadQuiz();
+    }
+
+    private async Task LoadQuiz()
+    {
+        _loading = true;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            // Get userId from LocalStorage first, then AuthService
+            string? userIdString = null;
+            
+            try
+            {
+                userIdString = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userId");
+                Console.WriteLine($"🔍 TakeQuiz: LocalStorage UserId={userIdString ?? "NULL"}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"TakeQuiz: LocalStorage error: {ex.Message}");
+            }
+            
+            if (string.IsNullOrEmpty(userIdString))
+            {
+                userIdString = AuthService.GetUserId();
+                Console.WriteLine($"🔍 TakeQuiz: AuthService UserId={userIdString ?? "NULL"}");
+            }
+            
+            if (string.IsNullOrEmpty(userIdString))
+            {
+                Console.WriteLine("TakeQuiz: No userId found");
+                _error = "Du skal være logget ind.";
+                Nav.NavigateTo("/login");
+                return;
+            }
+
+            if (!Guid.TryParse(userIdString, out var userId))
+            {
+                Console.WriteLine("TakeQuiz: Invalid userId format");
+                _error = "Ugyldig bruger session.";
+                Nav.NavigateTo("/login");
+                return;
+            }
+
+            // Store in AuthService for later use
+            AuthService.SetUserId(userIdString);
+
+            Console.WriteLine($"TakeQuiz: Calling QuizClient.GetQuizAsync(quizId={QuizId}, userId={userId})");
+            
+            _quiz = await QuizClient.GetQuizAsync(QuizId, userId);
+
+            if (_quiz == null)
+            {
+                Console.WriteLine("TakeQuiz: Quiz not found");
+                _error = "Quiz blev ikke fundet.";
+            }
+            else
+            {
+                Console.WriteLine($"TakeQuiz: Successfully loaded quiz: {_quiz.Title} with {_quiz.Questions.Count} questions");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"TakeQuiz: Exception: {ex.Message}");
+            _error = $"Der opstod en fejl: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void StartQuiz()
+    {
+        _quizStarted = true;
+        _startTime = DateTime.UtcNow;
+        _selectedAnswers.Clear();
+        _unansweredQuestions.Clear();
+        
+        // Start timer that updates every second
+        _timer = new System.Threading.Timer(async _ =>
+        {
+            _elapsedTime = DateTime.UtcNow - _startTime;
+            await InvokeAsync(StateHasChanged);
+        }, null, 0, 1000);
+        
+        StateHasChanged();
+    }
+
+    private void SelectAnswer(Guid questionId, Guid optionId)
+    {
+        _selectedAnswers[questionId] = optionId;
+        _unansweredQuestions.Remove(questionId);
+        _validationError = null;
+        StateHasChanged();
+    }
+
+    private async Task SubmitQuiz()
+    {
+        // Validate all questions are answered
+        _unansweredQuestions.Clear();
+        
+        foreach (var question in _quiz!.Questions)
+        {
+            if (!_selectedAnswers.ContainsKey(question.QuestionId))
+            {
+                _unansweredQuestions.Add(question.QuestionId);
+            }
+        }
+
+        if (_unansweredQuestions.Any())
+        {
+            _validationError = $"Du skal besvare alle spørgsmål. Der mangler {_unansweredQuestions.Count} svar.";
+            
+            // Scroll to first unanswered question
+            var firstUnanswered = _unansweredQuestions.First();
+            await JSRuntime.InvokeVoidAsync("eval", 
+                $"document.getElementById('question-{firstUnanswered}')?.scrollIntoView({{ behavior: 'smooth', block: 'center' }})");
+            
+            StateHasChanged();
+            return;
+        }
+
+        _submitting = true;
+        StateHasChanged();
+
+        try
+        {
+            // Stop timer
+            _timer?.Dispose();
+            _endTime = DateTime.UtcNow;
+            _elapsedTime = _endTime - _startTime;
+
+            // Prepare answers
+            var answers = _selectedAnswers.Select(kvp => new QuizAnswerDto
+            {
+                QuestionId = kvp.Key,
+                SelectedOptionId = kvp.Value
+            }).ToList();
+
+            // Get userId
+            var userIdString = AuthService.GetUserId();
+            if (string.IsNullOrEmpty(userIdString) || !Guid.TryParse(userIdString, out var userId))
+            {
+                _error = "Session udløbet. Log ind igen.";
+                Nav.NavigateTo("/login");
+                return;
+            }
+
+            // Submit via gRPC client with duration
+            var durationSeconds = (int)_elapsedTime.TotalSeconds;
+            _result = await QuizClient.SubmitQuizAsync(QuizId, userId, answers, durationSeconds);
+
+            if (_result == null)
+            {
+                _error = "Kunne ikke indsende quizzen. Prøv igen.";
+            }
+            else
+            {
+                _quizSubmitted = true;
+                Console.WriteLine($"TakeQuiz: Quiz submitted - Score: {_result.Score}/{_result.TotalPoints} ({_result.Percentage:F1}%)");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"TakeQuiz: Submit error: {ex.Message}");
+            _error = "Der opstod en fejl ved indsendelse af quiz.";
+        }
+        finally
+        {
+            _submitting = false;
+            StateHasChanged();
+        }
+    }
+
+    private void RetakeQuiz()
+    {
+        _quizStarted = false;
+        _quizSubmitted = false;
+        _selectedAnswers.Clear();
+        _unansweredQuestions.Clear();
+        _result = null;
+        _validationError = null;
+        _elapsedTime = TimeSpan.Zero;
+        StateHasChanged();
+    }
+
+    private void ClearValidationError()
+    {
+        _validationError = null;
+        StateHasChanged();
+    }
+
+    private string FormatElapsedTime()
+    {
+        return _elapsedTime.ToString(@"mm\:ss");
+    }
+
+    private string FormatDuration()
+    {
+        var duration = _endTime - _startTime;
+        if (duration.TotalMinutes >= 1)
+        {
+            return $"{(int)duration.TotalMinutes}m {duration.Seconds}s";
+        }
+        return $"{duration.Seconds}s";
+    }
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+    }
+}

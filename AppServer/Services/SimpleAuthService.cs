@@ -2,13 +2,10 @@ using System.Collections.Concurrent;
 
 namespace AppServer.Services;
 
-/// <summary>
-/// Singleton service that stores the currently logged-in userId
-/// SIMPLIFICATION: One user = one active session at a time
-/// </summary>
+// Singleton service der gemmer den aktuelt indloggede userId (én bruger = én aktiv session ad gangen)
 public class SimpleAuthService
 {
-    // Just store the current userId - no circuit tracking needed!
+    // Gemmer bare den aktuelle userId - ingen circuit tracking nødvendig
     private string? _currentUserId;
     private readonly object _lock = new object();
 
@@ -17,7 +14,7 @@ public class SimpleAuthService
         lock (_lock)
         {
             _currentUserId = userId;
-            Console.WriteLine($"✅ SimpleAuthService: Stored userId={userId}");
+            Console.WriteLine($"SimpleAuthService: Stored userId={userId}");
         }
     }
 
@@ -25,7 +22,7 @@ public class SimpleAuthService
     {
         lock (_lock)
         {
-            Console.WriteLine($"🔍 SimpleAuthService: GetUserId() = {_currentUserId ?? "NULL"}");
+            Console.WriteLine($"SimpleAuthService: GetUserId() = {_currentUserId ?? "NULL"}");
             return _currentUserId;
         }
     }
@@ -34,7 +31,7 @@ public class SimpleAuthService
     {
         lock (_lock)
         {
-            Console.WriteLine($"🗑️ SimpleAuthService: Cleared userId");
+            Console.WriteLine($"SimpleAuthService: Cleared userId");
             _currentUserId = null;
         }
     }
