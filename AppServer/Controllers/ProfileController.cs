@@ -5,7 +5,10 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace AppServer.Controllers;
 
-// REST API controller til brugerprofil operationer (hent profil, skift password)
+/// <summary>
+/// Håndterer brugerprofil operationer via REST API (hent profil, opdater password).
+/// Verificerer password lokalt og kommunikerer med DataServer for lagring.
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 public class ProfileController : ControllerBase

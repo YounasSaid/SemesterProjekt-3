@@ -3,7 +3,8 @@ using Microsoft.AspNetCore.Components.Server.Circuits;
 namespace AppServer.Services;
 
 /// <summary>
-/// Circuit handler that clears userId when circuit disconnects
+/// Circuit handler til Blazor SignalR forbindelser.
+/// Rydder userId når brugeren disconnecter fra serveren.
 /// </summary>
 public class SimpleCircuitHandler : CircuitHandler
 {

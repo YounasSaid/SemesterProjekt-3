@@ -1,7 +1,8 @@
 namespace AppServer.Models;
 
 /// <summary>
-/// DTO for leaderboard entry
+/// DTO for en leaderboard entry (rangliste post).
+/// Indeholder bruger information og statistik til visning af top spillere.
 /// </summary>
 public class LeaderboardEntryDto
 {

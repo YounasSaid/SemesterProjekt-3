@@ -6,7 +6,10 @@ using SemesterProjekt.Proto.User;
 
 namespace AppServer.Controllers;
 
-// REST API controller til autentificering (register, login, logout)
+/// <summary>
+/// Håndterer bruger autentificering via REST API (registrering, login, logout).
+/// Koordinerer mellem AppServer og DataServer via gRPC for brugervalidering og session management.
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 public class AuthController : ControllerBase

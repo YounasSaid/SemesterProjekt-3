@@ -1,8 +1,12 @@
-﻿using System;
+using System;
 
 namespace AppServer.Models;
 
-    public class RegisterResponse
-    {
-        public Guid UserId { get; set; }
-    }
+/// <summary>
+/// Response model for succesfuld bruger registrering.
+/// Returnerer den nyoprettede brugers ID.
+/// </summary>
+public class RegisterResponse
+{
+    public Guid UserId { get; set; }
+}

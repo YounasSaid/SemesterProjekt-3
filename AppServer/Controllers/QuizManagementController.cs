@@ -6,7 +6,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace AppServer.Controllers;
 
 /// <summary>
-/// REST API controller for quiz management operations
+/// Håndterer quiz administration via REST API (opret, hent, slet, indsend quizzer).
+/// Koordinerer mellem brugere og DataServer for quiz operationer og validering.
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]

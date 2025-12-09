@@ -1,7 +1,7 @@
 namespace AppServer.Models;
 
 /// <summary>
-/// DTO for a single quiz answer (question -> selected option)
+/// DTO for et enkelt quiz svar (spørgsmål -> valgt svarmulighed).
 /// </summary>
 public class QuizAnswerDto
 {
@@ -10,7 +10,7 @@ public class QuizAnswerDto
 }
 
 /// <summary>
-/// Request model for submitting quiz answers
+/// Request model til indsendelse af quiz svar.
 /// </summary>
 public class SubmitQuizRequest
 {
@@ -19,7 +19,8 @@ public class SubmitQuizRequest
 }
 
 /// <summary>
-/// DTO for quiz submission result
+/// DTO for quiz indsendelse resultat.
+/// Indeholder score, procent og individuelle svar resultater.
 /// </summary>
 public class QuizSubmissionResultDto
 {
@@ -30,15 +31,15 @@ public class QuizSubmissionResultDto
     public int CorrectCount => Results.Count(r => r.IsCorrect);
     public int TotalCount => Results.Count;
     public List<AnswerResultDto> Results { get; set; } = new();
-    
-    // New fields for attempt tracking
+
+    // Nye felter til forsøgs tracking
     public string? AttemptId { get; set; }
     public bool IsNewBest { get; set; }
     public int PreviousBestScore { get; set; }
 }
 
 /// <summary>
-/// DTO for individual answer result
+/// DTO for individuelt svar resultat.
 /// </summary>
 public class AnswerResultDto
 {
@@ -48,7 +49,8 @@ public class AnswerResultDto
 }
 
 /// <summary>
-/// DTO for attempt summary
+/// DTO for forsøgs oversigt.
+/// Bruges til at vise historik over gennemførte quizzer.
 /// </summary>
 public class AttemptSummaryDto
 {
@@ -77,7 +79,8 @@ public class AttemptSummaryDto
 }
 
 /// <summary>
-/// DTO for user statistics
+/// DTO for bruger statistik.
+/// Samlet oversigt over brugerens quiz præstationer.
 /// </summary>
 public class UserStatsDto
 {

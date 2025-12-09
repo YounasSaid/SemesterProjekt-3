@@ -1,7 +1,11 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace AppServer.Models;
 
+/// <summary>
+/// Request model til bruger registrering.
+/// Validerer navn, email, password og semester.
+/// </summary>
 public class RegisterRequest
 {
     [Required] public string FirstName { get; set; } = "";

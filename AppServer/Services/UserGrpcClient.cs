@@ -3,7 +3,10 @@ using SemesterProjekt.Proto.User;
 
 namespace AppServer.Services;
 
-// gRPC klient til bruger-relaterede operationer
+/// <summary>
+/// gRPC klient til bruger-relaterede operationer.
+/// Kommunikerer med DataServer for bruger oprettelse, hentning og password opdatering.
+/// </summary>
 public class UserGrpcClient : IDisposable
 {
     private readonly GrpcChannel _channel;

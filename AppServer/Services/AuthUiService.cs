@@ -8,6 +8,10 @@ using AppServer.Models;
 
 namespace AppServer.Services;
 
+/// <summary>
+/// HTTP service til autentificering fra Blazor UI komponenter.
+/// Kalder AuthController's REST API endpoints for registrering og login.
+/// </summary>
 public class AuthUiService
 {
     private readonly HttpClient _http;

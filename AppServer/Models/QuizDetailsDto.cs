@@ -1,5 +1,9 @@
 namespace AppServer.Models;
 
+/// <summary>
+/// DTO for detaljeret quiz information.
+/// Indeholder fuld quiz med alle spørgsmål og svarmuligheder.
+/// </summary>
 public class QuizDetailsDto
 {
     public Guid QuizId { get; set; }
@@ -9,6 +13,9 @@ public class QuizDetailsDto
     public DateTime CreatedAt { get; set; }
 }
 
+/// <summary>
+/// DTO for et enkelt quiz spørgsmål med svarmuligheder.
+/// </summary>
 public class QuestionDto
 {
     public Guid QuestionId { get; set; }
@@ -18,6 +25,9 @@ public class QuestionDto
     public List<QuestionOptionDto> Options { get; set; } = new();
 }
 
+/// <summary>
+/// DTO for en svarmulighed til et quiz spørgsmål.
+/// </summary>
 public class QuestionOptionDto
 {
     public Guid OptionId { get; set; }

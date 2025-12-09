@@ -4,7 +4,10 @@ using AppServer.Models;
 
 namespace AppServer.Services;
 
-// gRPC klient til quiz-relaterede operationer
+/// <summary>
+/// gRPC klient til quiz-relaterede operationer.
+/// Håndterer kommunikation med DataServer for quiz CRUD, submission, leaderboard og statistik.
+/// </summary>
 public class QuizGrpcClient : IDisposable
 {
     private readonly GrpcChannel _channel;

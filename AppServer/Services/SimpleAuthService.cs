@@ -2,7 +2,10 @@ using System.Collections.Concurrent;
 
 namespace AppServer.Services;
 
-// Singleton service der gemmer den aktuelt indloggede userId (én bruger = én aktiv session ad gangen)
+/// <summary>
+/// Singleton service til simpel session tracking af indlogget bruger.
+/// Gemmer den aktuelle userId i memory (én bruger = én aktiv session ad gangen).
+/// </summary>
 public class SimpleAuthService
 {
     // Gemmer bare den aktuelle userId - ingen circuit tracking nødvendig

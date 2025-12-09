@@ -1,27 +1,28 @@
 namespace AppServer.Models;
 
 /// <summary>
-/// DTO for the result of creating a quiz
+/// DTO for resultatet af at oprette en quiz.
+/// Returneres til klienten efter succesfuld quiz oprettelse.
 /// </summary>
 public class CreateQuizResultDto
 {
     /// <summary>
-    /// The ID of the created quiz
+    /// ID'et på den oprettede quiz
     /// </summary>
     public Guid QuizId { get; set; }
 
     /// <summary>
-    /// The title of the quiz
+    /// Titlen på quizzen
     /// </summary>
     public string Title { get; set; } = string.Empty;
 
     /// <summary>
-    /// Number of questions in the quiz
+    /// Antal spørgsmål i quizzen
     /// </summary>
     public int QuestionCount { get; set; }
 
     /// <summary>
-    /// Total points available in the quiz
+    /// Total point tilgængelig i quizzen
     /// </summary>
     public int TotalPoints { get; set; }
 }

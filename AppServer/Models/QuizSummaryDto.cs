@@ -1,32 +1,33 @@
 namespace AppServer.Models;
 
 /// <summary>
-/// DTO for quiz summary information
+/// DTO for quiz oversigt information.
+/// Bruges til liste visninger uden fulde detaljer.
 /// </summary>
 public class QuizSummaryDto
 {
     /// <summary>
-    /// The ID of the quiz
+    /// ID'et på quizzen
     /// </summary>
     public Guid QuizId { get; set; }
 
     /// <summary>
-    /// The title of the quiz
+    /// Titlen på quizzen
     /// </summary>
     public string Title { get; set; } = string.Empty;
 
     /// <summary>
-    /// Number of questions in the quiz
+    /// Antal spørgsmål i quizzen
     /// </summary>
     public int QuestionCount { get; set; }
 
     /// <summary>
-    /// Total points available in the quiz
+    /// Total point tilgængelig i quizzen
     /// </summary>
     public int TotalPoints { get; set; }
 
     /// <summary>
-    /// When the quiz was created
+    /// Hvornår quizzen blev oprettet
     /// </summary>
     public DateTime CreatedAt { get; set; }
 }
